@@ -32,6 +32,7 @@ import {
   HardDrive,
   Image as ImageIcon,
   LoaderCircle,
+  Minus,
   Package,
   Pencil,
   Plus,
@@ -159,7 +160,15 @@ async function api<T = any>(url: string, init?: RequestInit): Promise<T> {
     throw new Error(data.error || `Erro HTTP ${response.status}`);
   return data as T;
 }
-function Toast({ message, onClose, onUndo }: { message: string; onClose: () => void; onUndo?: () => void }) {
+function Toast({
+  message,
+  onClose,
+  onUndo,
+}: {
+  message: string;
+  onClose: () => void;
+  onUndo?: () => void;
+}) {
   useEffect(() => {
     if (!message) return;
     const id = window.setTimeout(onClose, 3800);
@@ -170,7 +179,14 @@ function Toast({ message, onClose, onUndo }: { message: string; onClose: () => v
     <div className="fixed bottom-5 right-5 z-[100] flex max-w-sm items-center gap-3 rounded-lg border bg-white px-4 py-3 text-sm shadow-lg">
       <Check className="h-4 w-4 text-emerald-600" />
       <span>{message}</span>
-      {onUndo && <button className="ml-2 font-semibold text-primary underline" onClick={onUndo}>Desfazer</button>}
+      {onUndo && (
+        <button
+          className="ml-2 font-semibold text-primary underline"
+          onClick={onUndo}
+        >
+          Desfazer
+        </button>
+      )}
       <button className="ml-2 text-muted-foreground" onClick={onClose}>
         <X className="h-4 w-4" />
       </button>
@@ -206,11 +222,25 @@ function App() {
   const [loggedIn, setLoggedIn] = useState(
     () => localStorage.getItem("equipcontrol-auth") === "ok",
   );
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportProject, setReportProject] = useState("__todos__");
+  const [items, setItems] = useState<Equipment[]>([]);
+
+  const reportProjects = useMemo(
+    () =>
+      [
+        ...new Set(
+          items.map((item) => (item.project || "").trim() || "Sem projeto"),
+        ),
+      ].sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [items],
+  );
   const [loginUser, setLoginUser] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [undoItems, setUndoItems] = useState<Equipment[]>([]);
-  const [undoAssets, setUndoAssets] = useState<Array<{ item: Equipment; field: "term" | "image"; value: string }>>([]);
-  const [items, setItems] = useState<Equipment[]>([]);
+  const [undoAssets, setUndoAssets] = useState<
+    Array<{ item: Equipment; field: "term" | "image"; value: string }>
+  >([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
@@ -224,6 +254,7 @@ function App() {
   const [selected, setSelected] = useState<string[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState("10");
   const [bulkStatus, setBulkStatus] = useState("Guardado");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [termItem, setTermItem] = useState<Equipment | null>(null);
@@ -261,26 +292,44 @@ function App() {
   }, [undoAssets]);
   const filtered = useMemo(
     () =>
-      items.filter((i) => {
-        const q = query.toLocaleLowerCase("pt-BR").trim();
-        return (
-          (!q ||
-            i.name.toLocaleLowerCase("pt-BR").includes(q) ||
-            (i.patrimonio || "").toLocaleLowerCase("pt-BR").includes(q) ||
-            (i.responsavel || "").toLocaleLowerCase("pt-BR").includes(q) ||
-            (i.project || "").toLocaleLowerCase("pt-BR").includes(q)) &&
-          (departmentFilter === "all" || i.department === departmentFilter) &&
-          (statusFilter === "all" || i.status === statusFilter) &&
-          (projectFilter === "all" ||
-            (i.project?.trim() || "Sem projeto") === projectFilter)
-        );
-      }),
+      items
+        .filter((i) => {
+          const q = query.toLocaleLowerCase("pt-BR").trim();
+
+          return (
+            (!q ||
+              i.name.toLocaleLowerCase("pt-BR").includes(q) ||
+              (i.patrimonio || "").toLocaleLowerCase("pt-BR").includes(q) ||
+              (i.responsavel || "").toLocaleLowerCase("pt-BR").includes(q) ||
+              (i.project || "").toLocaleLowerCase("pt-BR").includes(q)) &&
+            (departmentFilter === "all" || i.department === departmentFilter) &&
+            (statusFilter === "all" || i.status === statusFilter) &&
+            (projectFilter === "all" ||
+              (i.project?.trim() || "Sem projeto") === projectFilter)
+          );
+        })
+        .sort((a, b) =>
+          a.name.localeCompare(b.name, "pt-BR", {
+            sensitivity: "base",
+            numeric: true,
+          }),
+        ),
     [items, query, departmentFilter, statusFilter, projectFilter],
   );
-  useEffect(() => { setPage(1); }, [query, departmentFilter, statusFilter, projectFilter]);
-  const pageCount = Math.max(1, Math.ceil(filtered.length / 10));
-  const pageItems = useMemo(() => filtered.slice((page - 1) * 10, page * 10), [filtered, page]);
-  useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
+  useEffect(() => {
+    setPage(1);
+  }, [query, departmentFilter, statusFilter, projectFilter, pageSize]);
+  const pageSizeNumber = Number(pageSize);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSizeNumber));
+
+  const pageItems = useMemo(
+    () => filtered.slice((page - 1) * pageSizeNumber, page * pageSizeNumber),
+    [filtered, page, pageSizeNumber],
+  );
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
   const displayRows = useMemo(() => {
     const normalize = (value: string) =>
       value
@@ -395,7 +444,43 @@ function App() {
             Clara Ribeiro
           </a>
         </footer>
-        <Toast message={toast} onClose={() => { setToast(""); setUndoAssets([]); }} onUndo={undoAssets.length ? () => { void (async () => { try { const byId = new Map<string, Equipment>(); for (const entry of undoAssets) { const current = byId.get(entry.item.id) || entry.item; byId.set(entry.item.id, { ...current, [entry.field]: entry.value }); } for (const item of byId.values()) await api(`/api/equipments/${encodeURIComponent(item.id)}`, { method: "PUT", body: JSON.stringify(item) }); setUndoAssets([]); await load(); notify("Remoção desfeita."); } catch (e) { notify(`Não foi possível desfazer: ${(e as Error).message}`); } })(); } : undefined} />
+        <Toast
+          message={toast}
+          onClose={() => {
+            setToast("");
+            setUndoAssets([]);
+          }}
+          onUndo={
+            undoAssets.length
+              ? () => {
+                  void (async () => {
+                    try {
+                      const byId = new Map<string, Equipment>();
+                      for (const entry of undoAssets) {
+                        const current = byId.get(entry.item.id) || entry.item;
+                        byId.set(entry.item.id, {
+                          ...current,
+                          [entry.field]: entry.value,
+                        });
+                      }
+                      for (const item of byId.values())
+                        await api(
+                          `/api/equipments/${encodeURIComponent(item.id)}`,
+                          { method: "PUT", body: JSON.stringify(item) },
+                        );
+                      setUndoAssets([]);
+                      await load();
+                      notify("Remoção desfeita.");
+                    } catch (e) {
+                      notify(
+                        `Não foi possível desfazer: ${(e as Error).message}`,
+                      );
+                    }
+                  })();
+                }
+              : undefined
+          }
+        />
       </div>
     );
   const openNew = () => {
@@ -425,59 +510,154 @@ function App() {
   };
   const setField = <K extends keyof FormValues>(key: K, value: FormValues[K]) =>
     setForm((old) => ({ ...old, [key]: value }));
+
   async function saveEquipment(event: React.FormEvent) {
     event.preventDefault();
+
     if (!form.name.trim() || !form.department) {
       notify("Informe o nome e o departamento.");
       return;
     }
+
     if (Boolean(form.responsavel.trim()) !== Boolean(termFile || form.term)) {
       notify(
         "Responsável e termo de compromisso são obrigatórios um quando o outro for informado.",
       );
       return;
     }
+
     setSaving(true);
+
     try {
       const term = termFile ? await readDataUrl(termFile) : form.term;
       const image = imageFile ? await readDataUrl(imageFile) : form.image;
-      const payload = {
+
+      const payload: Equipment = {
         ...form,
         id:
           editing?.id ||
           `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`,
+        name: form.name.trim(),
+        department: form.department.trim(),
+        project: form.project.trim(),
         value: Number(form.value) || 0,
-        quantity: Math.max(1, Number(form.quantity) || 1),
+        quantity: Math.max(1, Math.floor(Number(form.quantity) || 1)),
+        status: form.status,
+        patrimonio: form.patrimonio.trim(),
+        responsavel: form.responsavel.trim(),
         term,
         image,
-        responsavel: form.responsavel.trim(),
       };
-      if (editing)
+
+      // Edição: atualiza somente o registro selecionado.
+      if (editing) {
         await api(`/api/equipments/${encodeURIComponent(editing.id)}`, {
           method: "PUT",
           body: JSON.stringify(payload),
         });
-      else
-        await api("/api/equipments", {
-          method: "POST",
-          body: JSON.stringify(payload),
+
+        const removedAssets = [
+          ...(editing.term && !term
+            ? [{ item: editing, field: "term" as const, value: editing.term }]
+            : []),
+          ...(editing.image && !image
+            ? [{ item: editing, field: "image" as const, value: editing.image }]
+            : []),
+        ];
+
+        await load();
+        setDialogOpen(false);
+
+        if (removedAssets.length) {
+          setUndoAssets(removedAssets);
+          notify("Arquivo removido. Você pode desfazer em até 3 segundos.");
+        } else {
+          notify("Equipamento atualizado.");
+        }
+
+        return;
+      }
+
+      // Cadastro ou duplicação: compara todos os atributos do equipamento.
+      const normalizeText = (value?: string | number) =>
+        String(value ?? "")
+          .normalize("NFC")
+          .trim()
+          .replace(/\s+/g, " ")
+          .toLocaleLowerCase("pt-BR");
+
+      const sameEquipment = (item: Equipment) =>
+        normalizeText(item.name) === normalizeText(payload.name) &&
+        normalizeText(item.department) === normalizeText(payload.department) &&
+        normalizeText(item.project) === normalizeText(payload.project) &&
+        Number(item.value || 0) === Number(payload.value || 0) &&
+        normalizeText(item.status) === normalizeText(payload.status) &&
+        normalizeText(item.patrimonio) === normalizeText(payload.patrimonio) &&
+        normalizeText(item.responsavel) ===
+          normalizeText(payload.responsavel) &&
+        (item.term || "") === (payload.term || "") &&
+        (item.image || "") === (payload.image || "");
+
+      const existing = items.find(sameEquipment);
+
+      if (existing) {
+        await api(`/api/equipments/${encodeURIComponent(existing.id)}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            ...existing,
+            quantity: Math.max(1, Number(existing.quantity) || 1) + 1,
+          }),
         });
+
+        await load();
+        setDialogOpen(false);
+        notify("Equipamento já cadastrado. Quantidade aumentada em 1 unidade.");
+        return;
+      }
+
+      await api("/api/equipments", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
       await load();
       setDialogOpen(false);
-      const removedAssets = editing ? ([
-        ...(editing.term && !term ? [{ item: editing, field: "term" as const, value: editing.term }] : []),
-        ...(editing.image && !image ? [{ item: editing, field: "image" as const, value: editing.image }] : []),
-      ]) : [];
-      if (removedAssets.length) {
-        setUndoAssets(removedAssets);
-        notify("Arquivo removido. Você pode desfazer em até 3 segundos.");
-      } else notify(editing ? "Equipamento atualizado." : "Equipamento cadastrado.");
+      notify("Equipamento cadastrado.");
     } catch (e) {
       notify(`Não foi possível salvar: ${(e as Error).message}`);
     } finally {
       setSaving(false);
     }
   }
+
+  async function changeQuantity(item: Equipment, delta: -1 | 1) {
+    const currentQuantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+
+    // Ao tentar diminuir de 1 para 0, pede confirmação para excluir.
+    if (delta === -1 && currentQuantity === 1) {
+      setSelected([item.id]);
+      setDeleteOpen(true);
+      return;
+    }
+
+    const newQuantity = currentQuantity + delta;
+
+    try {
+      await api(`/api/equipments/${encodeURIComponent(item.id)}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          ...item,
+          quantity: newQuantity,
+        }),
+      });
+
+      await load();
+      notify(`Quantidade atualizada para ${newQuantity}.`);
+    } catch (e) {
+      notify(`Falha ao atualizar quantidade: ${(e as Error).message}`);
+    }
+  }
+
   async function updateStatus(item: Equipment, status: string) {
     try {
       await api(`/api/equipments/${encodeURIComponent(item.id)}`, {
@@ -668,7 +848,10 @@ function App() {
   }
 
   function exportExcel() {
-    if (!items.length) { notify("Não há registros para exportar."); return; }
+    if (!items.length) {
+      notify("Não há registros para exportar.");
+      return;
+    }
     const rows = items.map((i) => ({
       Patrimônio: i.patrimonio || "",
       Equipamento: i.name,
@@ -706,34 +889,349 @@ function App() {
     );
     notify("Planilha Excel baixada.");
   }
+
   function exportProjectReport() {
-    if (!items.length) { notify("Não há registros para gerar o relatório."); return; }
-    void (async () => {
-      try {
-        const pdf = await PDFDocument.create();
-        const font = await pdf.embedFont(StandardFonts.Helvetica);
-        const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-        const projects = new Map<string, Equipment[]>();
-        for (const item of items) { const name = (item.project || "").trim() || "Sem projeto"; if (!projects.has(name)) projects.set(name, []); projects.get(name)!.push(item); }
-        let pagePdf = pdf.addPage([595.28, 841.89]);
-        let y = 790;
-        const draw = (text: string, size = 10, isBold = false) => { if (y < 55) { pagePdf = pdf.addPage([595.28, 841.89]); y = 790; } pagePdf.drawText(text.slice(0, 105), { x: 42, y, size, font: isBold ? bold : font, color: rgb(0.12, 0.17, 0.24) }); y -= size + 8; };
-        pagePdf.drawRectangle({ x: 0, y: 770, width: 595.28, height: 72, color: rgb(0.04, 0.35, 0.34) });
-        pagePdf.drawText("RELATÓRIO DE INVESTIMENTOS POR PROJETO", { x: 35, y: 805, size: 16, font: bold, color: rgb(1,1,1) });
-        pagePdf.drawText(`Gerado em ${new Date().toLocaleDateString("pt-BR")}`, { x: 35, y: 785, size: 9, font, color: rgb(1,1,1) }); y = 745;
-        let grandTotal = 0;
-        for (const [project, list] of [...projects.entries()].sort((a,b) => a[0].localeCompare(b[0], "pt-BR"))) {
-          const total = list.reduce((sum, i) => sum + (Number(i.value) || 0) * (Number(i.quantity) || 1), 0); grandTotal += total;
-          draw(project, 13, true); draw(`${list.length} registro(s)  |  ${list.reduce((sum, i) => sum + (Number(i.quantity) || 1), 0)} unidade(s)  |  Total investido: ${money(total)}`, 10, true);
-          draw("Equipamento | Quantidade | Valor unitário | Total", 9, true);
-          for (const item of list) draw(`${item.name} | ${Number(item.quantity) || 1} | ${money(item.value)} | ${money((Number(item.value) || 0) * (Number(item.quantity) || 1))}`, 8);
-          y -= 10;
-        }
-        y -= 4; draw(`TOTAL GERAL INVESTIDO: ${money(grandTotal)}`, 13, true);
-        const bytes = await pdf.save(); const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `relatorio-projetos-${new Date().toISOString().slice(0,10)}.pdf`; a.click(); URL.revokeObjectURL(url); notify("Relatório PDF gerado.");
-      } catch (e) { notify(`Não foi possível gerar o relatório: ${(e as Error).message}`); }
-    })();
+    if (!items.length) {
+      notify("Não há registros para gerar o relatório.");
+      return;
+    }
+
+    // Abre a janela para escolher o projeto antes de gerar o PDF.
+    setReportProject("__todos__");
+    setReportDialogOpen(true);
   }
+
+  async function generateProjectReport() {
+    const selectedItems =
+      reportProject === "__todos__"
+        ? items
+        : items.filter(
+            (item) =>
+              ((item.project || "").trim() || "Sem projeto") === reportProject,
+          );
+
+    if (!selectedItems.length) {
+      notify("Não há equipamentos para o projeto selecionado.");
+      return;
+    }
+
+    setGenerating(true);
+
+    try {
+      const pdf = await PDFDocument.create();
+      const font = await pdf.embedFont(StandardFonts.Helvetica);
+      const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+      const pageWidth = 841.89;
+      const pageHeight = 595.28;
+      const margin = 28;
+      const tableWidth = pageWidth - margin * 2;
+      const headerHeight = 70;
+      const rowHeight = 27;
+      const bottomLimit = 42;
+
+      const projectTitle =
+        reportProject === "__todos__" ? "Todos os projetos" : reportProject;
+
+      const columns = [
+        { title: "Equipamento", width: 165 },
+        { title: "Departamento", width: 82 },
+        { title: "Responsável", width: 105 },
+        { title: "Projeto / fonte", width: 155 },
+        { title: "Valor unit.", width: 78 },
+        { title: "Qtd.", width: 38 },
+        { title: "Status", width: 92 },
+      ];
+
+      const originalWidth = columns.reduce(
+        (sum, column) => sum + column.width,
+        0,
+      );
+
+      columns.forEach((column) => {
+        column.width = (column.width / originalWidth) * tableWidth;
+      });
+
+      const sortedItems = [...selectedItems].sort((a, b) =>
+        a.name.localeCompare(b.name, "pt-BR", {
+          sensitivity: "base",
+          numeric: true,
+        }),
+      );
+
+      const colors = {
+        primary: rgb(0.04, 0.35, 0.34),
+        text: rgb(0.12, 0.17, 0.24),
+        muted: rgb(0.4, 0.45, 0.51),
+        border: rgb(0.87, 0.89, 0.91),
+        alternate: rgb(0.95, 0.97, 0.98),
+        white: rgb(1, 1, 1),
+        header: rgb(0.91, 0.94, 0.95),
+      };
+
+      let pagePdf = pdf.addPage([pageWidth, pageHeight]);
+      let y = 0;
+      let rowNumber = 0;
+      let pageNumber = 0;
+
+      const drawCellText = (
+        value: string,
+        x: number,
+        baseline: number,
+        maxWidth: number,
+        size = 7.5,
+        isBold = false,
+      ) => {
+        const selectedFont = isBold ? bold : font;
+        const originalText = String(value || "—");
+        let output = originalText;
+
+        while (
+          output.length > 1 &&
+          selectedFont.widthOfTextAtSize(output, size) > maxWidth
+        ) {
+          output = output.slice(0, -1);
+        }
+
+        if (output !== originalText && output.length > 3) {
+          output = `${output.slice(0, -3)}...`;
+        }
+
+        pagePdf.drawText(output, {
+          x,
+          y: baseline,
+          size,
+          font: selectedFont,
+          color: colors.text,
+        });
+      };
+
+      const drawFooter = () => {
+        pagePdf.drawText(`Página ${pageNumber}`, {
+          x: pageWidth - margin - 45,
+          y: 18,
+          size: 8,
+          font,
+          color: colors.muted,
+        });
+      };
+
+      const drawPageHeader = () => {
+        pageNumber++;
+
+        pagePdf.drawRectangle({
+          x: 0,
+          y: pageHeight - headerHeight,
+          width: pageWidth,
+          height: headerHeight,
+          color: colors.primary,
+        });
+
+        pagePdf.drawText("EQUIPCONTROL", {
+          x: margin,
+          y: pageHeight - 25,
+          size: 16,
+          font: bold,
+          color: colors.white,
+        });
+
+        pagePdf.drawText("Inventário de equipamentos", {
+          x: margin,
+          y: pageHeight - 42,
+          size: 9,
+          font,
+          color: colors.white,
+        });
+
+        const title =
+          projectTitle.length > 90
+            ? `${projectTitle.slice(0, 87)}...`
+            : projectTitle;
+
+        pagePdf.drawText(`Projeto: ${title}`, {
+          x: margin,
+          y: pageHeight - 59,
+          size: 8,
+          font,
+          color: colors.white,
+        });
+
+        const dateText = `Gerado em ${new Date().toLocaleDateString("pt-BR")}`;
+
+        pagePdf.drawText(dateText, {
+          x: pageWidth - margin - font.widthOfTextAtSize(dateText, 9),
+          y: pageHeight - 27,
+          size: 9,
+          font,
+          color: colors.white,
+        });
+
+        y = pageHeight - headerHeight - 24;
+
+        const tableHeaderHeight = 25;
+
+        pagePdf.drawRectangle({
+          x: margin,
+          y: y - tableHeaderHeight + 5,
+          width: tableWidth,
+          height: tableHeaderHeight,
+          color: colors.header,
+        });
+
+        let x = margin;
+
+        for (const column of columns) {
+          drawCellText(
+            column.title,
+            x + 6,
+            y - 10,
+            column.width - 12,
+            7.5,
+            true,
+          );
+
+          x += column.width;
+        }
+
+        y -= tableHeaderHeight;
+      };
+
+      let grandTotal = 0;
+      let totalQuantity = 0;
+
+      drawPageHeader();
+
+      for (const item of sortedItems) {
+        if (y - rowHeight < bottomLimit) {
+          drawFooter();
+          drawPageHeader();
+        }
+
+        const quantity = Math.max(1, Number(item.quantity) || 1);
+        const unitValue = Number(item.value) || 0;
+
+        grandTotal += unitValue * quantity;
+        totalQuantity += quantity;
+
+        if (rowNumber % 2 === 1) {
+          pagePdf.drawRectangle({
+            x: margin,
+            y: y - rowHeight + 5,
+            width: tableWidth,
+            height: rowHeight,
+            color: colors.alternate,
+          });
+        }
+
+        pagePdf.drawLine({
+          start: { x: margin, y: y - rowHeight + 5 },
+          end: { x: margin + tableWidth, y: y - rowHeight + 5 },
+          thickness: 0.5,
+          color: colors.border,
+        });
+
+        const values = [
+          item.name || "Sem descrição",
+          item.department || "—",
+          item.responsavel || "Não atribuído",
+          (item.project || "").trim() || "Sem projeto",
+          money(unitValue),
+          String(quantity),
+          item.status || "—",
+        ];
+
+        let x = margin;
+
+        values.forEach((value, index) => {
+          const column = columns[index];
+
+          drawCellText(value, x + 6, y - 12, column.width - 12, 7.5);
+
+          x += column.width;
+        });
+
+        y -= rowHeight;
+        rowNumber++;
+      }
+
+      // Mantém o resumo na mesma página, quando houver espaço.
+      if (y - 55 < bottomLimit) {
+        drawFooter();
+        drawPageHeader();
+      }
+
+      y -= 8;
+
+      pagePdf.drawLine({
+        start: { x: margin, y },
+        end: { x: margin + tableWidth, y },
+        thickness: 1,
+        color: colors.primary,
+      });
+
+      y -= 20;
+
+      const summaryText =
+        `Registros: ${sortedItems.length}   |   ` +
+        `Unidades: ${totalQuantity}`;
+
+      pagePdf.drawText(summaryText, {
+        x: margin,
+        y,
+        size: 9,
+        font: bold,
+        color: colors.text,
+      });
+
+      const totalText = `Total investido: ${money(grandTotal)}`;
+
+      pagePdf.drawText(totalText, {
+        x: pageWidth - margin - bold.widthOfTextAtSize(totalText, 11),
+        y,
+        size: 11,
+        font: bold,
+        color: colors.primary,
+      });
+
+      drawFooter();
+
+      const bytes = await pdf.save();
+      const blob = new Blob([new Uint8Array(bytes)], {
+        type: "application/pdf",
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+
+      const date = new Date().toISOString().slice(0, 10);
+      const safeProject = projectTitle
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 60);
+
+      a.href = url;
+      a.download =
+        reportProject === "__todos__"
+          ? `inventario-todos-os-projetos-${date}.pdf`
+          : `inventario-${safeProject || "projeto"}-${date}.pdf`;
+
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      setReportDialogOpen(false);
+      notify("PDF do inventário gerado.");
+    } catch (e) {
+      notify(`Não foi possível gerar o PDF: ${(e as Error).message}`);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((i) => selected.includes(i.id));
   return (
@@ -754,13 +1252,15 @@ function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={exportProjectReport}><FileText className="h-4 w-4" /> PDF por projeto</Button>
+            <Button variant="outline" size="sm" onClick={exportProjectReport}>
+              <FileText className="h-4 w-4" /> Relatório
+            </Button>
             <Button
               variant="outline"
               onClick={exportExcel}
               className="hidden sm:inline-flex"
             >
-              <ArrowDownToLine className="h-4 w-4" /> Exportar Excel
+              <ArrowDownToLine className="h-4 w-4" /> Dados
             </Button>
             <Button
               variant="outline"
@@ -863,24 +1363,74 @@ function App() {
             <div className="flex flex-wrap gap-2">
               {selected.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{selected.length} selecionado(s)</span>
+                  <span className="text-xs text-muted-foreground">
+                    {selected.length} selecionado(s)
+                  </span>
                   <Select value={bulkStatus} onValueChange={setBulkStatus}>
-                    <SelectTrigger className="h-9 w-[150px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>{statuses.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}</SelectContent>
+                    <SelectTrigger className="h-9 w-[150px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statuses.map((st) => (
+                        <SelectItem key={st} value={st}>
+                          {st}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
-                  <Button size="sm" variant="outline" onClick={async () => { try { await Promise.all(items.filter((i) => selected.includes(i.id)).map((i) => api(`/api/equipments/${encodeURIComponent(i.id)}`, { method: "PUT", body: JSON.stringify({ ...i, status: bulkStatus }) }))); await load(); notify("Status atualizado para os registros selecionados."); } catch (e) { notify(`Falha ao atualizar status: ${(e as Error).message}`); } }}>Aplicar status</Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setDeleteOpen(true)}
-                  className="text-white"
-                >
-                  <Trash2 className="h-4 w-4" /> Excluir ({selected.length})
-                </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        await Promise.all(
+                          items
+                            .filter((i) => selected.includes(i.id))
+                            .map((i) =>
+                              api(
+                                `/api/equipments/${encodeURIComponent(i.id)}`,
+                                {
+                                  method: "PUT",
+                                  body: JSON.stringify({
+                                    ...i,
+                                    status: bulkStatus,
+                                  }),
+                                },
+                              ),
+                            ),
+                        );
+                        await load();
+                        notify(
+                          "Status atualizado para os registros selecionados.",
+                        );
+                      } catch (e) {
+                        notify(
+                          `Falha ao atualizar status: ${(e as Error).message}`,
+                        );
+                      }
+                    }}
+                  >
+                    Aplicar status
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setDeleteOpen(true)}
+                    className="text-white"
+                  >
+                    <Trash2 className="h-4 w-4" /> Excluir ({selected.length})
+                  </Button>
                 </div>
               )}
-              
-              <Button variant="outline" size="sm" onClick={exportExcel} className="sm:hidden"><ArrowDownToLine className="h-4 w-4" /> Excel</Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportExcel}
+                className="sm:hidden"
+              >
+                <ArrowDownToLine className="h-4 w-4" /> Excel
+              </Button>
             </div>
           </CardHeader>
           <div className="grid gap-3 border-b bg-slate-50/70 p-4 md:grid-cols-[minmax(220px,1fr)_200px_180px_220px]">
@@ -892,7 +1442,16 @@ function App() {
                 placeholder="Buscar por equipamento, patrimônio ou responsável..."
                 className="bg-white pl-9 pr-9"
               />
-              {query && <button type="button" aria-label="Limpar pesquisa" onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></button>}
+              {query && (
+                <button
+                  type="button"
+                  aria-label="Limpar pesquisa"
+                  onClick={() => setQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
             <Select
               value={departmentFilter}
@@ -957,8 +1516,18 @@ function App() {
                     <>
                       <SelectItem value="all">Todos os Projetos</SelectItem>
                       {projects.map((project) => (
-                        <SelectItem key={project} value={project} textValue={project}>
-                          <span className="block max-w-[175px] truncate" title={project}>{project}</span> (R${" "}
+                        <SelectItem
+                          key={project}
+                          value={project}
+                          textValue={project}
+                        >
+                          <span
+                            className="block max-w-[175px] truncate"
+                            title={project}
+                          >
+                            {project}
+                          </span>{" "}
+                          (R${" "}
                           {fmt(
                             total(
                               items.filter(
@@ -1125,8 +1694,21 @@ function App() {
                           ].join(", ")}
                         </td>
                         <td className="px-4 py-4 text-slate-500">Todos</td>
-                        <td className="px-4 py-4 font-medium">{entry.items.filter((i) => Boolean(i.term)).length} PDF(s)</td>
-                        <td className="px-4 py-4 font-medium tabular-nums">{money(entry.items.reduce((sum, i) => sum + (Number(i.value) || 0) * (Number(i.quantity) || 1), 0))}</td>
+                        <td className="px-4 py-4 font-medium">
+                          {entry.items.filter((i) => Boolean(i.term)).length}{" "}
+                          PDF(s)
+                        </td>
+                        <td className="px-4 py-4 font-medium tabular-nums">
+                          {money(
+                            entry.items.reduce(
+                              (sum, i) =>
+                                sum +
+                                (Number(i.value) || 0) *
+                                  (Number(i.quantity) || 1),
+                              0,
+                            ),
+                          )}
+                        </td>
                         <td className="px-4 py-4 font-semibold tabular-nums">
                           {entry.items.reduce(
                             (sum, i) =>
@@ -1135,7 +1717,27 @@ function App() {
                           )}
                         </td>
                         <td className="px-4 py-4 text-xs">
-                          <div className="flex flex-wrap gap-1">{statuses.map((status) => { const count = entry.items.filter((i) => i.status === status).length; return count ? <Badge key={status} className={status === "Guardado" ? "bg-violet-100 text-violet-800 hover:bg-violet-100" : status === "Em Uso" ? "bg-blue-100 text-blue-800 hover:bg-blue-100" : "bg-amber-100 text-amber-800 hover:bg-amber-100"}>{status}: {count}</Badge> : null; })}</div>
+                          <div className="flex flex-wrap gap-1">
+                            {statuses.map((status) => {
+                              const count = entry.items.filter(
+                                (i) => i.status === status,
+                              ).length;
+                              return count ? (
+                                <Badge
+                                  key={status}
+                                  className={
+                                    status === "Guardado"
+                                      ? "bg-violet-100 text-violet-800 hover:bg-violet-100"
+                                      : status === "Em Uso"
+                                        ? "bg-blue-100 text-blue-800 hover:bg-blue-100"
+                                        : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                                  }
+                                >
+                                  {status}: {count}
+                                </Badge>
+                              ) : null;
+                            })}
+                          </div>
                         </td>
                         <td className="px-5 py-4 text-right">
                           <Button
@@ -1178,7 +1780,9 @@ function App() {
                                 className="h-4 w-4 rounded border-slate-300 accent-teal-700"
                               />
                             </td>
-                            <td className={`px-4 py-4 ${entry.parentKey ? "border-l-4 border-l-slate-200 pl-7" : ""}`}>
+                            <td
+                              className={`px-4 py-4 ${entry.parentKey ? "border-l-4 border-l-slate-200 pl-7" : ""}`}
+                            >
                               <div className="flex items-center gap-3">
                                 {item.image ? (
                                   <img
@@ -1287,9 +1891,39 @@ function App() {
                             <td className="px-4 py-4 font-medium tabular-nums">
                               {money(item.value)}
                             </td>
+
                             <td className="px-4 py-4 tabular-nums">
-                              {item.quantity}
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7 shrink-0"
+                                  title="Diminuir quantidade"
+                                  aria-label={`Diminuir quantidade de ${item.name}`}
+                                  onClick={() => void changeQuantity(item, -1)}
+                                >
+                                  <Minus className="h-3.5 w-3.5" />
+                                </Button>
+
+                                <span className="min-w-5 text-center font-medium">
+                                  {item.quantity}
+                                </span>
+
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7 shrink-0"
+                                  title="Aumentar quantidade"
+                                  aria-label={`Aumentar quantidade de ${item.name}`}
+                                  onClick={() => void changeQuantity(item, 1)}
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             </td>
+
                             <td className="px-4 py-4">
                               <Select
                                 value={item.status}
@@ -1300,7 +1934,13 @@ function App() {
                                 <SelectTrigger className="h-8 w-[142px] border-0 bg-transparent px-2 shadow-none focus:ring-1">
                                   <Badge
                                     variant="secondary"
-                                    className={item.status === "Guardado" ? "bg-violet-100 text-violet-800 hover:bg-violet-100" : item.status === "Em Uso" ? "bg-blue-100 text-blue-800 hover:bg-blue-100" : "bg-amber-100 text-amber-800 hover:bg-amber-100"}
+                                    className={
+                                      item.status === "Guardado"
+                                        ? "bg-violet-100 text-violet-800 hover:bg-violet-100"
+                                        : item.status === "Em Uso"
+                                          ? "bg-blue-100 text-blue-800 hover:bg-blue-100"
+                                          : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                                    }
                                   >
                                     {item.status}
                                   </Badge>
@@ -1369,14 +2009,58 @@ function App() {
               </tbody>
             </table>
           </div>
-          <div className="flex flex-col gap-2 border-t bg-white px-5 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              Exibindo {filtered.length} de {items.length} registros
-            </span>
-            <span>
-              Os arquivos são armazenados no servidor; o banco mantém apenas os
-              caminhos.
-            </span>
+
+          <div className="flex flex-col gap-3 border-t bg-white px-5 py-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <span>
+                Exibindo{" "}
+                {filtered.length === 0 ? 0 : (page - 1) * pageSizeNumber + 1}–
+                {Math.min(page * pageSizeNumber, filtered.length)} de{" "}
+                {filtered.length} registros
+              </span>
+
+              <div className="flex items-center gap-2">
+                <span className="whitespace-nowrap">Registros por página:</span>
+                <Select value={pageSize} onValueChange={setPageSize}>
+                  <SelectTrigger className="h-8 w-[80px] bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page === 1}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+              >
+                Anterior
+              </Button>
+
+              <span className="whitespace-nowrap">
+                Página {page} de {pageCount}
+              </span>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page >= pageCount}
+                onClick={() =>
+                  setPage((current) => Math.min(pageCount, current + 1))
+                }
+              >
+                Próxima
+              </Button>
+            </div>
           </div>
         </Card>
         <div className="flex items-center justify-between rounded-xl border border-dashed bg-white/60 px-4 py-3 text-xs text-muted-foreground">
@@ -1480,8 +2164,17 @@ function App() {
                     ]
                       .sort((a, b) => a.localeCompare(b, "pt-BR"))
                       .map((project) => (
-                        <SelectItem key={project} value={project} textValue={project}>
-                          <span className="block max-w-[220px] truncate" title={project}>{project}</span>
+                        <SelectItem
+                          key={project}
+                          value={project}
+                          textValue={project}
+                        >
+                          <span
+                            className="block max-w-[220px] truncate"
+                            title={project}
+                          >
+                            {project}
+                          </span>
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -1573,7 +2266,24 @@ function App() {
                       >
                         Abrir documento
                       </a>
-                      <button type="button" className="mt-2 block text-xs font-medium text-red-600 underline" onClick={() => { if (window.confirm("Deseja remover o PDF deste equipamento?")) { setField("term", ""); notify("PDF removido do formulário. Salve em até 3 segundos para confirmar a alteração."); } }}>Remover PDF</button>
+                      <button
+                        type="button"
+                        className="mt-2 block text-xs font-medium text-red-600 underline"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              "Deseja remover o PDF deste equipamento?",
+                            )
+                          ) {
+                            setField("term", "");
+                            notify(
+                              "PDF removido do formulário. Salve em até 3 segundos para confirmar a alteração.",
+                            );
+                          }
+                        }}
+                      >
+                        Remover PDF
+                      </button>
                     </div>
                   </div>
                 )}
@@ -1594,7 +2304,24 @@ function App() {
                       >
                         Abrir imagem
                       </a>
-                      <button type="button" className="mt-2 block text-xs font-medium text-red-600 underline" onClick={() => { if (window.confirm("Deseja remover a imagem deste equipamento?")) { setField("image", ""); notify("Imagem removida do formulário. Salve em até 3 segundos para confirmar a alteração."); } }}>Remover imagem</button>
+                      <button
+                        type="button"
+                        className="mt-2 block text-xs font-medium text-red-600 underline"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              "Deseja remover a imagem deste equipamento?",
+                            )
+                          ) {
+                            setField("image", "");
+                            notify(
+                              "Imagem removida do formulário. Salve em até 3 segundos para confirmar a alteração.",
+                            );
+                          }
+                        }}
+                      >
+                        Remover imagem
+                      </button>
                     </div>
                   </div>
                 )}
@@ -1701,7 +2428,138 @@ function App() {
           </form>
         </DialogContent>
       </Dialog>
-      <Toast message={toast} onClose={() => { setToast(""); setUndoAssets([]); }} onUndo={undoAssets.length ? () => { void (async () => { try { const byId = new Map<string, Equipment>(); for (const entry of undoAssets) { const current = byId.get(entry.item.id) || entry.item; byId.set(entry.item.id, { ...current, [entry.field]: entry.value }); } for (const item of byId.values()) await api(`/api/equipments/${encodeURIComponent(item.id)}`, { method: "PUT", body: JSON.stringify(item) }); setUndoAssets([]); await load(); notify("Remoção desfeita."); } catch (e) { notify(`Não foi possível desfazer: ${(e as Error).message}`); } })(); } : undefined} />
+      <Dialog
+        open={reportDialogOpen}
+        onOpenChange={(open) => {
+          if (!generating) setReportDialogOpen(open);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <div>
+            <DialogTitle className="text-xl font-bold">
+              Gerar relatório PDF
+            </DialogTitle>
+
+            <DialogDescription className="mt-1">
+              Escolha um projeto para gerar o relatório ou selecione todos para
+              incluir o inventário completo.
+            </DialogDescription>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-sm font-medium text-slate-700">
+              Projeto / fonte do recurso
+            </label>
+
+            <Select
+              value={reportProject}
+              onValueChange={setReportProject}
+              disabled={generating}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione o projeto" />
+              </SelectTrigger>
+
+              <SelectContent>
+                <SelectItem value="__todos__">Todos os projetos</SelectItem>
+
+                {reportProjects.map((project) => (
+                  <SelectItem key={project} value={project} textValue={project}>
+                    <span
+                      className="block max-w-[300px] truncate"
+                      title={project}
+                    >
+                      {project}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="rounded-lg border bg-slate-50 p-3 text-sm">
+            <p className="font-medium text-slate-800">
+              {reportProject === "__todos__"
+                ? "Inventário completo"
+                : reportProject}
+            </p>
+
+            <p className="mt-1 text-xs text-slate-500">
+              {
+                items.filter(
+                  (item) =>
+                    reportProject === "__todos__" ||
+                    ((item.project || "").trim() || "Sem projeto") ===
+                      reportProject,
+                ).length
+              }{" "}
+              registro(s) serão incluídos no PDF.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 border-t pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setReportDialogOpen(false)}
+              disabled={generating}
+            >
+              Cancelar
+            </Button>
+
+            <Button
+              type="button"
+              onClick={() => void generateProjectReport()}
+              disabled={generating || items.length === 0}
+            >
+              {generating ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+
+              {generating ? "Gerando PDF..." : "Gerar PDF"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Toast
+        message={toast}
+        onClose={() => {
+          setToast("");
+          setUndoAssets([]);
+        }}
+        onUndo={
+          undoAssets.length
+            ? () => {
+                void (async () => {
+                  try {
+                    const byId = new Map<string, Equipment>();
+                    for (const entry of undoAssets) {
+                      const current = byId.get(entry.item.id) || entry.item;
+                      byId.set(entry.item.id, {
+                        ...current,
+                        [entry.field]: entry.value,
+                      });
+                    }
+                    for (const item of byId.values())
+                      await api(
+                        `/api/equipments/${encodeURIComponent(item.id)}`,
+                        { method: "PUT", body: JSON.stringify(item) },
+                      );
+                    setUndoAssets([]);
+                    await load();
+                    notify("Remoção desfeita.");
+                  } catch (e) {
+                    notify(
+                      `Não foi possível desfazer: ${(e as Error).message}`,
+                    );
+                  }
+                })();
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }
