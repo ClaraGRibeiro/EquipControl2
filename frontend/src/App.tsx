@@ -224,6 +224,8 @@ function App() {
   );
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [reportProject, setReportProject] = useState("__todos__");
+  const [excelDialogOpen, setExcelDialogOpen] = useState(false);
+  const [excelProject, setExcelProject] = useState("__todos__");
   const [items, setItems] = useState<Equipment[]>([]);
 
   const reportProjects = useMemo(
@@ -852,42 +854,82 @@ function App() {
       notify("Não há registros para exportar.");
       return;
     }
-    const rows = items.map((i) => ({
-      Patrimônio: i.patrimonio || "",
-      Equipamento: i.name,
-      Departamento: i.department,
-      "Projeto / fonte do recurso": i.project || "Não informado",
-      Responsável: i.responsavel || "",
-      "Valor unitário": Number(i.value) || 0,
-      Quantidade: Number(i.quantity) || 1,
-      Status: i.status,
-      PDF: i.term
-        ? new URL(i.term, window.location.origin).href
-        : "Não anexado",
-      Imagem: i.image
-        ? new URL(i.image, window.location.origin).href
-        : "Sem imagem",
-    }));
-    const sheet = XLSX.utils.json_to_sheet(rows);
-    sheet["!cols"] = [
-      { wch: 20 },
-      { wch: 32 },
-      { wch: 20 },
-      { wch: 28 },
-      { wch: 25 },
-      { wch: 16 },
-      { wch: 12 },
-      { wch: 18 },
-      { wch: 45 },
-      { wch: 45 },
-    ];
-    const book = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(book, sheet, "Equipamentos");
-    XLSX.writeFile(
-      book,
-      `equipamentos-${new Date().toISOString().slice(0, 10)}.xlsx`,
-    );
-    notify("Planilha Excel baixada.");
+
+    setExcelProject("__todos__");
+    setExcelDialogOpen(true);
+  }
+
+  function generateExcel() {
+    const selectedItems =
+      excelProject === "__todos__"
+        ? items
+        : items.filter(
+            (item) =>
+              ((item.project || "").trim() || "Sem projeto") === excelProject,
+          );
+
+    if (!selectedItems.length) {
+      notify("Não há equipamentos para o projeto selecionado.");
+      return;
+    }
+
+    try {
+      const rows = selectedItems.map((i) => ({
+        Patrimônio: i.patrimonio || "",
+        Equipamento: i.name,
+        Departamento: i.department,
+        "Projeto / fonte do recurso": i.project || "Não informado",
+        Responsável: i.responsavel || "",
+        "Valor unitário": Number(i.value) || 0,
+        Quantidade: Number(i.quantity) || 1,
+        Status: i.status,
+        PDF: i.term
+          ? new URL(i.term, window.location.origin).href
+          : "Não anexado",
+        Imagem: i.image
+          ? new URL(i.image, window.location.origin).href
+          : "Sem imagem",
+      }));
+
+      const sheet = XLSX.utils.json_to_sheet(rows);
+
+      sheet["!cols"] = [
+        { wch: 20 },
+        { wch: 32 },
+        { wch: 20 },
+        { wch: 28 },
+        { wch: 25 },
+        { wch: 16 },
+        { wch: 12 },
+        { wch: 18 },
+        { wch: 45 },
+        { wch: 45 },
+      ];
+
+      const book = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(book, sheet, "Equipamentos");
+
+      const date = new Date().toISOString().slice(0, 10);
+
+      const safeProject = excelProject
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 60);
+
+      const filename =
+        excelProject === "__todos__"
+          ? `equipamentos-todos-os-projetos-${date}.xlsx`
+          : `equipamentos-${safeProject || "projeto"}-${date}.xlsx`;
+
+      XLSX.writeFile(book, filename);
+
+      setExcelDialogOpen(false);
+      notify("Planilha Excel baixada.");
+    } catch (e) {
+      notify(`Não foi possível gerar o Excel: ${(e as Error).message}`);
+    }
   }
 
   function exportProjectReport() {
@@ -2523,6 +2565,88 @@ function App() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={excelDialogOpen} onOpenChange={setExcelDialogOpen}>
+        <DialogContent className="max-w-md">
+          <div>
+            <DialogTitle className="text-xl font-bold">
+              Exportar dados para Excel
+            </DialogTitle>
+
+            <DialogDescription className="mt-1">
+              Escolha um projeto específico ou selecione todos para exportar o
+              inventário completo.
+            </DialogDescription>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-sm font-medium text-slate-700">
+              Projeto / fonte do recurso
+            </label>
+
+            <Select value={excelProject} onValueChange={setExcelProject}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione o projeto" />
+              </SelectTrigger>
+
+              <SelectContent>
+                <SelectItem value="__todos__">Todos os projetos</SelectItem>
+
+                {reportProjects.map((project) => (
+                  <SelectItem key={project} value={project} textValue={project}>
+                    <span
+                      className="block max-w-[300px] truncate"
+                      title={project}
+                    >
+                      {project}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="rounded-lg border bg-slate-50 p-3 text-sm">
+            <p className="font-medium text-slate-800">
+              {excelProject === "__todos__"
+                ? "Inventário completo"
+                : excelProject}
+            </p>
+
+            <p className="mt-1 text-xs text-slate-500">
+              {
+                items.filter(
+                  (item) =>
+                    excelProject === "__todos__" ||
+                    ((item.project || "").trim() || "Sem projeto") ===
+                      excelProject,
+                ).length
+              }{" "}
+              registro(s) serão incluídos na planilha Excel.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 border-t pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setExcelDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+
+            <Button
+              type="button"
+              onClick={generateExcel}
+              disabled={items.length === 0}
+            >
+              <ArrowDownToLine className="h-4 w-4" />
+              Gerar Excel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Toast
         message={toast}
         onClose={() => {
