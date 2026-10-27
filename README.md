@@ -1,70 +1,175 @@
-# EquipControl — React + TypeScript + shadcn/ui
+# EquipControl — Inventário de equipamentos (OTMG)
 
-Interface migrada para React, TypeScript, Vite, Tailwind CSS e componentes no padrão shadcn/ui. O back-end Express e o banco MariaDB foram mantidos.
+Sistema de gestão de patrimônio e equipamentos: cadastro, controle de status por unidade, anexos (termo de compromisso em PDF e foto), relatório de custos por projeto e exportação para Excel.
+
+Front-end em **React + TypeScript + Vite + Tailwind** com componentes no padrão **shadcn/ui**. Back-end **Express** e banco **MariaDB** mantidos da versão anterior.
+
+## Stack e arquitetura
+
+| Camada | Implementação |
+|---|---|
+| Interface | React 18, TypeScript, Vite 6, Tailwind CSS, Radix (shadcn/ui) em `frontend/` |
+| API | Express 4 (`server.js`) — rotas `/api/equipments`, estáticos `/uploads/*` e `frontend/dist` |
+| Banco | MariaDB/MySQL com `mysql2` (`db.js`) |
+| Documentos | Arquivos em `uploads/terms/` e `uploads/images/`; o banco guarda apenas o caminho |
+| Geração de PDF | `pdf-lib` no navegador: termo gerado sobre o `template.pdf` e enviado como Data URL |
+| Planilha | `xlsx` no navegador |
 
 ## Requisitos
-- Node.js 20 ou superior recomendado
+
+- Node.js 20 ou superior
 - MariaDB acessível na porta 3306
-- Banco `equip_control` e tabela `equipments` existentes
+- Banco `equip_control` e tabela `equipments` criados (schema abaixo)
 
-## Configurar banco
-Por padrão, o `db.js` conecta em `localhost:3306`, usuário `root`, senha `otmg123` e banco `equip_control`. Recomenda-se configurar credenciais por variáveis de ambiente em vez de manter senha no código:
+## Configurar o banco
 
-- `DB_HOST`
-- `DB_PORT`
-- `DB_USER`
-- `DB_PASSWORD`
-- `DB_NAME`
+O `db.js` usa, por padrão, `localhost:3306`, usuário `root`, senha `otmg123` e banco `equip_control`. Prefira sobrescrever por variáveis de ambiente em vez de manter a senha no código (o arquivo `.env` já está no `.gitignore`, mas o código não o carrega — exporte as variáveis no ambiente):
+
+| Variável | Padrão |
+|---|---|
+| `DB_HOST` | `localhost` |
+| `DB_PORT` | `3306` |
+| `DB_USER` | `root` |
+| `DB_PASSWORD` | `otmg123` |
+| `DB_NAME` | `equip_control` |
+
+O projeto **não cria a tabela** e não usa ferramenta de migração. Se a tabela ainda não existir, crie-a:
+
+```sql
+CREATE TABLE IF NOT EXISTS equipments (
+  id          VARCHAR(50)  NOT NULL PRIMARY KEY,
+  name        VARCHAR(255) NOT NULL,
+  department  VARCHAR(100) NOT NULL,
+  value       DECIMAL(10,2) DEFAULT 0,
+  quantity    INT DEFAULT 1,
+  status      VARCHAR(50) DEFAULT 'Guardado',
+  patrimonio  VARCHAR(255),
+  responsavel VARCHAR(255),
+  term        LONGTEXT,
+  image       LONGTEXT,
+  created_at  TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  project     VARCHAR(255)
+);
+```
+
+Para popular com a base de exemplo, execute `seed.txt` (13 equipamentos). Ele referencia arquivos já versionados em `uploads/`; confirme que eles existem antes de importar.
+
+A coluna `project` é adicionada automaticamente na inicialização do servidor (`server.js`) quando não existir, sem apagar registros.
 
 ## Instalação e desenvolvimento
-Na raiz do projeto:
 
 ```bash
 npm install
 npm run dev
 ```
 
-O back-end roda em `http://localhost:3000` e o Vite em `http://localhost:5173`. Abra a URL do Vite durante o desenvolvimento.
+O back-end sobe em `http://localhost:3000` e o Vite em `http://localhost:5173`. **Durante o desenvolvimento, abra a URL do Vite** — o `vite.config.ts` faz proxy de `/api`, `/uploads` e `/template.pdf` para o Express.
+
+## Scripts
+
+| Comando | O que faz |
+|---|---|
+| `npm run dev` | Express + Vite em paralelo (concurrently) |
+| `npm run server:dev` | Apenas o Express |
+| `npm run client:dev` | Apenas o Vite |
+| `npm run build` | Compila o front-end em `frontend/dist` |
+| `npm start` | Executa o build e inicia o Express |
+| `npm test` | Testes de `assets.js` com o runner nativo do Node (`node --test`) |
 
 ## Produção
+
 ```bash
 npm install
 npm run build
 npm start
 ```
 
-Depois do build, acesse `http://localhost:3000`. O Express entrega os arquivos compilados de `frontend/dist` e mantém as rotas `/api` e `/uploads`.
+Depois do build, acesse `http://localhost:3000`: o Express entrega os arquivos de `frontend/dist` e mantém as rotas `/api` e `/uploads`. Como `npm start` já roda o build antes de subir, não fica um `frontend/dist` antigo servindo código velho.
 
-## Recursos da interface
-- Listagem, pesquisa e filtros de equipamentos
-- Indicadores de total, em uso, guardados e manutenção
-- Login de interface (usuário `admin`, senha `otmg123`) e botão Sair
-- Cadastro, edição, duplicação e exclusão individual/em lote com opção de desfazer por 3 segundos
-- Agrupamento visual de registros com o mesmo nome
-- Campo de projeto/fonte do recurso e relatório PDF de custos por projeto (quantidades e custos somados)
-- Validação conjunta de responsável e termo de compromisso
-- Upload de PDF e imagem com prévia dos arquivos já associados
-- Atualização de status via API
-- Geração de termo com todos os campos obrigatórios e anexação do PDF
-- Exportação da listagem para Excel
-- Componentes UI no padrão shadcn/ui (Button, Input, Card, Badge, Dialog e Select)
+## API
 
-A coluna `project` é adicionada automaticamente à tabela existente na inicialização, sem apagar os registros atuais. Depois de atualizar o código, execute `npm install` e `npm run build` antes de iniciar em produção, para gerar o front-end atualizado.
+| Método | Rota | Observações |
+|---|---|---|
+| `GET` | `/api/equipments` | Retorna todos os registros e migra automaticamente termos/imagens antigos salvos como Base64 para arquivos em disco |
+| `POST` | `/api/equipments` | Cria. Exige `id`, `name`, `department`; `responsavel` e `term` precisam vir juntos |
+| `PUT` | `/api/equipments/:id` | Atualiza. Campos `term`/`image` ausentes no corpo mantêm o valor atual; arquivos substituídos são removidos do disco |
+| `POST` | `/api/equipments/restore` | Reinsere registros excluídos (usado pelo "Desfazer"). Corpo `{ "items": [...], "trashId": "..." }`: se enviado, os arquivos voltam da lixeira; caminhos sem arquivo são limpos antes de reinserir |
+| `POST` | `/api/equipments/trash/purge` | Apaga em definitivo os arquivos do lote informado. Corpo `{ "trashId": "..." }` (ou `trashIds: [...]`). Chamado pela interface quando o desfazer expira |
+| `DELETE` | `/api/equipments` | Corpo `{ "ids": [...] }`. Remove as linhas do banco, move os PDFs/imagens para `uploads/.trash/<trashId>/` e devolve `{ items, trashId, trashed, missing }` |
+| `GET` | `/uploads/terms/*`, `/uploads/images/*` | Arquivos estáticos |
+| `GET` | `/template.pdf` | Modelo usado na geração do termo |
 
-**Atenção:** o login solicitado é feito no navegador e não protege diretamente a API; para publicar em rede externa, implemente autenticação no servidor.
+O `id` é gerado no front-end (`base36 do timestamp + sufixo aleatório`) quando não informado.
 
-## Arquivos e banco
-Os PDFs são armazenados em `uploads/terms/` e imagens em `uploads/images/`. O banco guarda apenas os caminhos nos campos `term` e `image`. Faça backup do banco e dessas duas pastas.
+### Ciclo de vida dos arquivos excluídos
 
-## Observações
-- O `template.pdf` deve permanecer na raiz do projeto para gerar termos.
-- A autenticação anterior era feita apenas no navegador e não protegia as rotas da API; ela não foi portada como se fosse segurança real. Antes de publicar em uma rede acessível, implemente autenticação e autorização no servidor.
-- A exportação Excel atual exporta os registros e links dos documentos; não incorpora os binários de PDFs/imagens dentro de um ZIP.
+1. `DELETE` move os arquivos para `uploads/.trash/<trashId>/` (o `trashId` é um UUID devolvido na resposta).
+2. Se o usuário clicar em **Desfazer** dentro dos 3 segundos, `POST /api/equipments/restore` devolve os arquivos para `uploads/terms|images/`.
+3. Quando o desfazer expira (ou o card é fechado), a interface chama `POST /api/equipments/trash/purge` e os arquivos somem do disco.
+4. Se a aba for fechada antes disso, a varredura automática remove os lotes com mais de 15 minutos na abertura da listagem e na inicialização do servidor.
 
-## Campo Projeto / fonte do recurso
+Os arquivos nunca são servidos pela rota `/uploads/*`: o Express publica apenas `uploads/terms` e `uploads/images`.
 
-O formulário de equipamento inclui o campo **Projeto / fonte do recurso** (por exemplo, FADENOR ou FAPEMIG). O valor é persistido na coluna `equipments.project`, aparece na listagem e na busca, é exportado para Excel e alimenta o relatório PDF de custos por projeto. A API de cadastro, edição e restauração também grava esse campo.
+## Funcionalidades
 
-A inicialização de produção (`npm start`) compila o front-end antes de iniciar o servidor, evitando servir um `frontend/dist` antigo sem as alterações mais recentes. Para desenvolvimento, use `npm run dev`.
+- Listagem com busca por nome, patrimônio, responsável e projeto
+- Filtros de departamento (`hardware`, `software`, `imobiliário`), status e projeto, com paginação de 10/50/100 registros
+- Indicadores de total, em uso, guardados e em manutenção
+- Cadastro, edição, duplicação e exclusão individual ou em lote, com **desfazer por 3 segundos** (restauração via API)
+- Cadastro duplicado: se todos os atributos coincidirem com um registro existente, a quantidade é aumentada em 1 em vez de criar um novo registro
+- Ajuste rápido de quantidade (+/−); reduzir de 1 para 0 pede confirmação de exclusão
+- Alteração de status individual ou em lote
+- Agrupamento expandível de registros com o mesmo nome
+- Campo **Projeto / fonte do recurso** (ex.: FADENOR, FAPEMIG): persistido em `equipments.project`, aparece na listagem e na busca, é filtrável, vai para o Excel e alimenta o relatório PDF
+- **Termo de responsabilidade**: formulário com 11 campos obrigatórios, gera o PDF sobre o `template.pdf` e anexa ao equipamento
+- Upload de PDF e imagem com prévia dos arquivos já associados e desfazer da remoção por 3 segundos
+- **Relatório PDF do inventário** por projeto ou para todos, com paginação de tabela, contagem de registros/unidades e total investido
+- **Exportação para Excel** por projeto ou para todos (os documentos entram como link, não como anexo binário)
+- Layout responsivo: no celular, as ações ficam em um menu e há botão flutuante de novo equipamento
 
-Se a coluna ainda não existir em outro banco, o servidor tenta adicioná-la automaticamente; no banco informado, ela já existe e não é necessário executar `ALTER TABLE` manualmente.
+## Acesso
+
+O login (`admin` / `otmg123`) é validado **no navegador** e guardado em `localStorage`.
+
+> **Atenção:** esse login não protege a API. Nenhuma rota `/api` exige autenticação, o `cors()` está aberto e o limite de corpo é de 50 MB. Antes de publicar em uma rede acessível, implemente autenticação e autorização no servidor.
+
+## Arquivos e backup
+
+- Termos em `uploads/terms/`, imagens em `uploads/images/`
+- `uploads/.trash/` é a lixeira temporária da exclusão; ela é ignorada pelo git e pode ser esvaziada manualmente
+- O banco guarda somente os caminhos nas colunas `term` e `image` (podem continuar `LONGTEXT`)
+- Faça backup do banco **e** dessas duas pastas. Em Docker, monte `uploads/` como volume persistente
+- O `template.pdf` deve permanecer na raiz para a geração de termos
+- Detalhes em [ARQUIVOS-PDF.md](ARQUIVOS-PDF.md)
+
+## Estrutura
+
+```
+.
+├── server.js              # API Express, uploads e estáticos
+├── assets.js              # Depósito de arquivos: salvar, lixeira, restaurar, purge
+├── db.js                  # Conexão MariaDB (mysql2)
+├── seed.txt               # Dados de exemplo
+├── template.pdf           # Modelo do termo de responsabilidade
+├── tests/assets.test.js   # Testes do depósito de arquivos
+├── uploads/terms|images/  # Arquivos enviados
+└── frontend/
+    ├── index.html
+    ├── vite.config.ts
+    └── src/
+        ├── App.tsx        # Tela, formulários, termo, PDF e Excel
+        ├── components/ui/ # Button, Input, Card, Badge, Dialog, Select
+        └── lib/utils.ts
+```
+
+## Limitações conhecidas
+
+- Autenticação apenas no navegador; a API fica aberta (ver aviso acima)
+- Sem lint e sem CI; os testes cobrem apenas o `assets.js` (salvar/lixeira/restaurar/purge)
+- `frontend/src/App.tsx` concentra em um único componente a tela, os formulários, o termo, o PDF e o Excel
+- Ao **substituir/remover um anexo** na edição (rotas `PUT`), o arquivo antigo é apagado na hora: o desfazer de 3 segundos da interface devolve o caminho, mas o arquivo já não existe. A lixeira hoje é usada só na exclusão do registro
+- Atualização de status em lote dispara uma requisição `PUT` por registro; não há endpoint de lote
+- A listagem não é paginada no servidor (`SELECT *`); toda filtragem é feita no navegador
+- `db.js` usa conexão única, sem pool nem reconexão: suba o MariaDB antes do Node
+- O bundle de produção passa de 1 MB porque `xlsx` e `pdf-lib` são carregados estaticamente
+- A dependência `zod` está instalada, mas não é utilizada

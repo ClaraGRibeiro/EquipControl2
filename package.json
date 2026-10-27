@@ -8,7 +8,8 @@
     "server:dev": "node server.js",
     "client:dev": "vite --config frontend/vite.config.ts",
     "build": "vite build --config frontend/vite.config.ts",
-    "start": "npm run build && node server.js"
+    "start": "npm run build && node server.js",
+    "test": "node --test \"tests/*.test.js\""
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.6",

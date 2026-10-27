@@ -2,77 +2,28 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 const db = require('./db');
+const { createAssetStore, isTrashBatchId } = require('./assets');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const uploadsRoot = path.join(__dirname, 'uploads');
-const termsDir = path.join(uploadsRoot, 'terms');
-const imagesDir = path.join(uploadsRoot, 'images');
-fs.mkdirSync(termsDir, { recursive: true });
-fs.mkdirSync(imagesDir, { recursive: true });
+// Os arquivos do registro excluído ficam em uploads/.trash enquanto o desfazer está aberto.
+const assets = createAssetStore({ uploadsRoot, trashTtlMs: 15 * 60 * 1000 });
+assets.sweepTrash().catch(() => {});
 
 app.use(cors());
 // Compatibilidade com bancos existentes: adiciona a coluna de projeto sem apagar dados.
 db.query("ALTER TABLE equipments ADD COLUMN project VARCHAR(255) NULL", (err) => { if (err && !/Duplicate column/i.test(err.message)) console.error('Migração da coluna project:', err.message); });
 // Os arquivos são enviados como Data URLs pelo front-end; limite mantido para compatibilidade.
 app.use(express.json({ limit: '50mb' }));
-app.use('/uploads/terms', express.static(termsDir, { fallthrough: false, maxAge: '1d' }));
-app.use('/uploads/images', express.static(imagesDir, { fallthrough: false, maxAge: '1d' }));
+app.use('/uploads/terms', express.static(assets.dirs.terms, { fallthrough: false, maxAge: '1d' }));
+app.use('/uploads/images', express.static(assets.dirs.images, { fallthrough: false, maxAge: '1d' }));
 const frontendDist = path.join(__dirname, 'frontend', 'dist');
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
 } else {
   app.use(express.static(__dirname));
-}
-
-function saveDataUrl(data, kind) {
-  if (!data) return Promise.resolve('');
-  const prefix = `/uploads/${kind}/`;
-  if (typeof data === 'string' && data.startsWith(prefix)) return Promise.resolve(data);
-  if (typeof data !== 'string') return Promise.reject(new Error(`Arquivo de ${kind === 'terms' ? 'termo' : 'imagem'} inválido.`));
-
-  let mime;
-  let base64;
-  if (kind === 'terms') {
-    const match = data.match(/^data:application\/pdf;base64,([A-Za-z0-9+/=\r\n]+)$/i);
-    if (!match) return Promise.reject(new Error('O termo deve ser um PDF válido.'));
-    mime = 'application/pdf';
-    base64 = match[1];
-  } else {
-    const match = data.match(/^data:(image\/(?:jpeg|png|webp|gif|bmp|avif));base64,([A-Za-z0-9+/=\r\n]+)$/i);
-    if (!match) return Promise.reject(new Error('A imagem deve estar em PNG, JPG, WEBP, GIF, BMP ou AVIF.'));
-    mime = match[1].toLowerCase();
-    base64 = match[2];
-  }
-
-  const buffer = Buffer.from(base64.replace(/\s/g, ''), 'base64');
-  if (!buffer.length) return Promise.reject(new Error('O arquivo enviado está vazio.'));
-  if (kind === 'terms' && buffer.subarray(0, 5).toString() !== '%PDF-') {
-    return Promise.reject(new Error('O conteúdo enviado não parece ser um PDF válido.'));
-  }
-  const extensionByMime = {
-    'application/pdf': 'pdf',
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-    'image/gif': 'gif',
-    'image/bmp': 'bmp',
-    'image/avif': 'avif',
-  };
-  const filename = `${crypto.randomUUID()}.${extensionByMime[mime]}`;
-  const dir = kind === 'terms' ? termsDir : imagesDir;
-  return fs.promises.writeFile(path.join(dir, filename), buffer)
-    .then(() => `${prefix}${filename}`);
-}
-
-function removeAssetFile(assetPath, kind) {
-  const prefix = `/uploads/${kind}/`;
-  if (typeof assetPath !== 'string' || !assetPath.startsWith(prefix)) return;
-  const filename = path.basename(assetPath);
-  const dir = kind === 'terms' ? termsDir : imagesDir;
-  fs.promises.unlink(path.join(dir, filename)).catch(() => {});
 }
 
 function query(sql, params = []) {
@@ -84,12 +35,12 @@ function query(sql, params = []) {
 async function migrateLegacyAssets(item) {
   let changed = false;
   if (typeof item.term === 'string' && item.term.startsWith('data:application/pdf;base64,')) {
-    item.term = await saveDataUrl(item.term, 'terms');
+    item.term = await assets.saveDataUrl(item.term, 'terms');
     await query('UPDATE equipments SET term = ? WHERE id = ?', [item.term, item.id]);
     changed = true;
   }
   if (typeof item.image === 'string' && item.image.startsWith('data:image/')) {
-    item.image = await saveDataUrl(item.image, 'images');
+    item.image = await assets.saveDataUrl(item.image, 'images');
     await query('UPDATE equipments SET image = ? WHERE id = ?', [item.image, item.id]);
     changed = true;
   }
@@ -98,6 +49,8 @@ async function migrateLegacyAssets(item) {
 
 // Listar equipamentos e migrar arquivos antigos em Base64 quando encontrados.
 app.get('/api/equipments', async (req, res) => {
+  // Abas fechadas antes do purge deixam lotes na lixeira; a varredura remove os antigos.
+  assets.sweepTrash().catch(() => {});
   try {
     const results = await query('SELECT * FROM equipments ORDER BY created_at DESC');
     for (const item of results) await migrateLegacyAssets(item);
@@ -116,8 +69,8 @@ app.post('/api/equipments', async (req, res) => {
   try {
     if (!id || !name || !department) return res.status(400).json({ error: 'Nome e departamento são obrigatórios.' });
     if (Boolean(String(responsavel).trim()) !== Boolean(term)) return res.status(400).json({ error: 'Responsável e termo de compromisso devem ser informados juntos.' });
-    termPath = await saveDataUrl(term, 'terms');
-    imagePath = await saveDataUrl(image, 'images');
+    termPath = await assets.saveDataUrl(term, 'terms');
+    imagePath = await assets.saveDataUrl(image, 'images');
     await query(
       `INSERT INTO equipments (id, name, department, value, quantity, status, patrimonio, responsavel, term, image, project)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -125,8 +78,8 @@ app.post('/api/equipments', async (req, res) => {
     );
     res.status(201).json({ message: 'Equipamento salvo com sucesso!' });
   } catch (err) {
-    removeAssetFile(termPath, 'terms');
-    removeAssetFile(imagePath, 'images');
+    void assets.removeFile(termPath, 'terms');
+    void assets.removeFile(imagePath, 'images');
     console.error('Erro ao cadastrar equipamento:', err);
     res.status(500).json({ error: err.message || 'Erro ao cadastrar equipamento.' });
   }
@@ -148,19 +101,19 @@ app.put('/api/equipments/:id', async (req, res) => {
     const responsavel = String(body.responsavel || '').trim();
     if (Boolean(responsavel) !== Boolean(term)) return res.status(400).json({ error: 'Responsável e termo de compromisso devem ser informados juntos.' });
 
-    newTermPath = await saveDataUrl(term, 'terms');
-    newImagePath = await saveDataUrl(image, 'images');
+    newTermPath = await assets.saveDataUrl(term, 'terms');
+    newImagePath = await assets.saveDataUrl(image, 'images');
     const result = await query(
       `UPDATE equipments SET name=?, department=?, value=?, quantity=?, status=?, patrimonio=?, responsavel=?, term=?, image=?, project=? WHERE id=?`,
       [body.name, body.department, body.value ?? 0, body.quantity ?? 1, body.status || 'Guardado', body.patrimonio || '', responsavel, newTermPath, newImagePath, body.project || '', id]
     );
     if (!result.affectedRows && !rows.length) return res.status(404).json({ error: 'Equipamento não encontrado.' });
-    if (oldTerm && oldTerm !== newTermPath) removeAssetFile(oldTerm, 'terms');
-    if (oldImage && oldImage !== newImagePath) removeAssetFile(oldImage, 'images');
+    if (oldTerm && oldTerm !== newTermPath) void assets.removeFile(oldTerm, 'terms');
+    if (oldImage && oldImage !== newImagePath) void assets.removeFile(oldImage, 'images');
     res.json({ message: 'Equipamento atualizado com sucesso!' });
   } catch (err) {
-    if (newTermPath && newTermPath !== req.body.term) removeAssetFile(newTermPath, 'terms');
-    if (newImagePath && newImagePath !== req.body.image) removeAssetFile(newImagePath, 'images');
+    if (newTermPath && newTermPath !== req.body.term) void assets.removeFile(newTermPath, 'terms');
+    if (newImagePath && newImagePath !== req.body.image) void assets.removeFile(newImagePath, 'images');
     console.error('Erro ao atualizar equipamento:', err);
     res.status(500).json({ error: err.message || 'Erro ao atualizar equipamento.' });
   }
@@ -169,24 +122,72 @@ app.put('/api/equipments/:id', async (req, res) => {
 // Restaura registros excluídos recentemente para permitir desfazer no front-end.
 app.post('/api/equipments/restore', async (req, res) => {
   const items = req.body?.items;
+  const trashId = req.body?.trashId;
   if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: 'Nenhum registro para restaurar.' });
+  if (trashId && !isTrashBatchId(trashId)) return res.status(400).json({ error: 'Identificador de lixeira inválido.' });
   try {
+    // Os arquivos voltam de uploads/.trash; caminhos sem arquivo são limpos antes de reinserir.
+    let lost = [];
+    try {
+      lost = await assets.restoreAssets(items, trashId);
+    } catch (trashErr) {
+      // Falha na lixeira não pode impedir a reinserção das linhas do banco.
+      console.error('Falha ao devolver arquivos da lixeira:', trashErr);
+      lost = items.flatMap((i) => [i.term, i.image].filter(Boolean).map(() => ({ id: i.id, field: 'arquivo' })));
+    }
     for (const i of items) await query(
       `INSERT INTO equipments (id,name,department,value,quantity,status,patrimonio,responsavel,term,image,project) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [i.id,i.name,i.department,i.value||0,i.quantity||1,i.status||'Guardado',i.patrimonio||'',i.responsavel||'',i.term||'',i.image||'',i.project||'']
     );
-    res.json({ message: 'Registros restaurados.' });
+    // O identificador da lixeira pode sumir: a limpeza é só higiene, o purge manual/varredura resolve.
+    try {
+      if (trashId) await assets.purgeTrash(trashId);
+    } catch (trashErr) {
+      console.error('Falha ao limpar a lixeira após o desfazer:', trashErr);
+    }
+    res.json({
+      message: lost.length
+        ? `Registros restaurados, mas ${lost.length} arquivo(s) já haviam saído da lixeira.`
+        : 'Registros restaurados.',
+      items,
+      lost,
+    });
   } catch (err) { res.status(500).json({ error: err.message || 'Falha ao restaurar.' }); }
 });
 
-// Excluir equipamentos e seus arquivos associados.
+// Apaga em definitivo os arquivos do lote excluído, quando o desfazer expira.
+app.post('/api/equipments/trash/purge', async (req, res) => {
+  const batches = req.body?.trashIds ?? req.body?.trashId;
+  const ids = Array.isArray(batches) ? batches : [batches];
+  if (ids.some((id) => id && !isTrashBatchId(id)))
+    return res.status(400).json({ error: 'Identificador de lixeira inválido.' });
+  try {
+    const removed = await assets.purgeTrash(ids);
+    res.json({ message: 'Lixeira limpa.', removed });
+  } catch (err) {
+    console.error('Erro ao limpar lixeira:', err);
+    res.status(500).json({ error: err.message || 'Falha ao limpar lixeira.' });
+  }
+});
+
+// Excluir equipamentos: a linha sai do banco e os arquivos vão para a lixeira.
 app.delete('/api/equipments', async (req, res) => {
   const ids = req.body?.ids;
   if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'Nenhum ID fornecido.' });
   try {
     const rows = await query('SELECT * FROM equipments WHERE id IN (?)', [ids]);
     await query('DELETE FROM equipments WHERE id IN (?)', [ids]);
-    res.json({ message: 'Equipamento(s) removido(s) com sucesso!', items: rows });
+    // O desfazer dura 3 segundos no front; a lixeira segura os arquivos até o purge.
+    const trashId = assets.newTrashBatch();
+    let trashed = 0;
+    let missing = 0;
+    try {
+      ({ trashed, missing } = await assets.trashAssets(rows, trashId));
+    } catch (trashErr) {
+      // A linha já saiu do banco: preservar o payload do desfazer vale mais que a lixeira.
+      console.error('Falha ao mover arquivos para a lixeira:', trashErr);
+    }
+    res.json({ message: 'Equipamento(s) removido(s) com sucesso!', items: rows, trashId, trashed, missing });
   } catch (err) {
     console.error('Erro ao excluir equipamento(s):', err);
     res.status(500).json({ error: err.message || 'Erro ao excluir equipamento(s).' });

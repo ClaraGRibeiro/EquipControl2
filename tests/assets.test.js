@@ -1,0 +1,151 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { test, beforeEach, afterEach } = require('node:test');
+
+const { createAssetStore, isTrashBatchId } = require('../assets');
+
+const PDF_BASE64 = Buffer.from('%PDF-1.4 equipcontrol termo de teste').toString('base64');
+const IMAGE_BASE64 = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).toString('base64');
+
+let root;
+let store;
+
+beforeEach(() => {
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'equipcontrol-assets-'));
+  store = createAssetStore({ uploadsRoot: root, trashTtlMs: 15 * 60 * 1000 });
+});
+
+afterEach(() => {
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+function writeActive(kind, filename, content = 'arquivo') {
+  fs.writeFileSync(path.join(store.dirs[kind], filename), content);
+  return `/uploads/${kind}/${filename}`;
+}
+
+test('salva o Data URL do termo e devolve o caminho público', async () => {
+  const saved = await store.saveDataUrl(`data:application/pdf;base64,${PDF_BASE64}`, 'terms');
+
+  assert.match(saved, /^\/uploads\/terms\/[0-9a-f-]{36}\.pdf$/);
+  assert.equal(fs.existsSync(store.localPath(saved, 'terms')), true);
+});
+
+test('rejeita termo que não é PDF', async () => {
+  await assert.rejects(
+    () => store.saveDataUrl('data:application/pdf;base64,JU5PVEElMFBESQ==', 'terms'),
+    /n\xE3o parece ser um PDF v\xE1lido/,
+  );
+});
+
+test('mantém caminhos já gravados, com ou sem barra inicial, sem regravar', async () => {
+  const current = writeActive('terms', 'atual.pdf');
+  const legacy = writeActive('terms', 'legado.pdf');
+
+  assert.equal(await store.saveDataUrl(current, 'terms'), current);
+  assert.equal(await store.saveDataUrl(legacy.replace(/^\//, ''), 'terms'), legacy.replace(/^\//, ''));
+});
+
+test('apagar registro move termo e imagem para a lixeira e esvazia uploads', async () => {
+  const term = writeActive('terms', 'equip-1.pdf');
+  const image = writeActive('images', 'equip-1.jpg');
+  const trashId = store.newTrashBatch();
+
+  const result = await store.trashAssets([{ id: 'equip-1', term, image }], trashId);
+
+  assert.deepEqual(result, { trashed: 2, missing: 0 });
+  assert.equal(fs.existsSync(store.localPath(term, 'terms')), false);
+  assert.equal(fs.existsSync(store.localPath(image, 'images')), false);
+  assert.equal(fs.existsSync(path.join(store.trashRoot, trashId, 'terms', 'equip-1.pdf')), true);
+  assert.equal(fs.existsSync(path.join(store.trashRoot, trashId, 'images', 'equip-1.jpg')), true);
+});
+
+test('registros sem anexo ou com caminho sem arquivo não quebram o apagamento', async () => {
+  const missing = writeActive('terms', 'existe.pdf');
+  fs.rmSync(store.localPath(missing, 'terms'));
+
+  const result = await store.trashAssets(
+    [{ id: 'a', term: missing, image: '' }, { id: 'b', term: '', image: '' }],
+    store.newTrashBatch(),
+  );
+
+  assert.deepEqual(result, { trashed: 0, missing: 1 });
+});
+
+test('desfazer devolve os arquivos da lixeira para uploads', async () => {
+  const term = writeActive('terms', 'volta.pdf');
+  const image = writeActive('images', 'volta.jpg');
+  const trashId = store.newTrashBatch();
+  await store.trashAssets([{ id: 'equip-2', term, image }], trashId);
+
+  const lost = await store.restoreAssets([{ id: 'equip-2', term, image }], trashId);
+
+  assert.deepEqual(lost, []);
+  assert.equal(fs.existsSync(store.localPath(term, 'terms')), true);
+  assert.equal(fs.existsSync(store.localPath(image, 'images')), true);
+});
+
+test('desfazer limpa o campo quando o arquivo não está mais na lixeira', async () => {
+  const term = writeActive('terms', 'sumido.pdf');
+  const trashId = store.newTrashBatch();
+  await store.trashAssets([{ id: 'equip-3', term }], trashId);
+  fs.rmSync(path.join(store.trashRoot, trashId, 'terms', 'sumido.pdf'));
+
+  const items = [{ id: 'equip-3', term }];
+  const lost = await store.restoreAssets(items, trashId);
+
+  assert.deepEqual(lost, [{ id: 'equip-3', field: 'term' }]);
+  assert.equal(items[0].term, '');
+});
+
+test('purge apaga a lixeira em definitivo', async () => {
+  writeActive('terms', 'definitivo.pdf');
+  const trashId = store.newTrashBatch();
+  await store.trashAssets([{ id: 'equip-4', term: '/uploads/terms/definitivo.pdf' }], trashId);
+
+  assert.equal(await store.purgeTrash(trashId), 1);
+  assert.equal(fs.existsSync(path.join(store.trashRoot, trashId)), false);
+});
+
+test('varredura remove apenas lotes mais velhos que o tempo de guarda', async () => {
+  const oldBatch = store.newTrashBatch();
+  const recentBatch = store.newTrashBatch();
+  writeActive('terms', 'velho.pdf');
+  writeActive('terms', 'novo.pdf');
+  await store.trashAssets([{ id: 'old', term: '/uploads/terms/velho.pdf' }], oldBatch);
+  await store.trashAssets([{ id: 'new', term: '/uploads/terms/novo.pdf' }], recentBatch);
+
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  fs.utimesSync(path.join(store.trashRoot, oldBatch), hourAgo, hourAgo);
+
+  assert.equal(await store.sweepTrash(), 1);
+  assert.equal(fs.existsSync(path.join(store.trashRoot, oldBatch)), false);
+  assert.equal(fs.existsSync(path.join(store.trashRoot, recentBatch)), true);
+  assert.equal(fs.existsSync(path.join(store.trashRoot, recentBatch, 'terms', 'novo.pdf')), true);
+  assert.equal(fs.existsSync(path.join(store.dirs.terms, 'velho.pdf')), false);
+});
+
+test('identificador de lixeira forjado não escreve fora de uploads', async () => {
+  const term = writeActive('terms', 'seguro.pdf');
+
+  for (const bad of ['../..', '..', 'x/../../etc', '']) {
+    await assert.rejects(() => store.trashAssets([{ id: 'e', term }], bad), /lixeira inv\xE1lido/);
+  }
+  assert.equal(fs.existsSync(store.localPath(term, 'terms')), true);
+});
+
+test('caminho malicioso na coluna do banco não escapa da pasta do tipo', () => {
+  const escaped = store.localPath('/uploads/terms/../../../../windows/system32/config/sam', 'terms');
+
+  assert.equal(escaped, path.join(store.dirs.terms, 'sam'));
+});
+
+test('apenas UUID é aceito como identificador de lixeira', async () => {
+  assert.equal(isTrashBatchId(store.newTrashBatch()), true);
+  for (const bad of ['../../etc', '1', '', null, undefined, 'x'.repeat(36)]) {
+    assert.equal(isTrashBatchId(bad), false);
+  }
+  await assert.rejects(() => store.purgeTrash('../../etc'), /lixeira inv\xE1lido/);
+});
