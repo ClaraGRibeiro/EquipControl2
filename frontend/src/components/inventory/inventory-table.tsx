@@ -1,0 +1,493 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  ChevronDown,
+  ClipboardList,
+  FilePlus2,
+  FileText,
+  HardDrive,
+  Image as ImageIcon,
+  LoaderCircle,
+  Minus,
+  Pencil,
+  Plus,
+  ShieldCheck,
+  Trash2,
+} from "lucide-react";
+import { statuses } from "@/lib/constants";
+import { money } from "@/lib/format";
+import { assetUrl } from "@/lib/files";
+import type { InventoryController } from "@/hooks/use-inventory";
+
+export function InventoryTable({ store }: { store: InventoryController }) {
+  const {
+    selected,
+    setSelected,
+    expandedGroups,
+    setExpandedGroups,
+    setDeleteOpen,
+    items,
+    loading,
+    changeQuantity,
+    updateStatus,
+    filtered,
+    displayRows,
+    openEdit,
+    openDuplicate,
+    openGenerate,
+    allFilteredSelected,
+  } = store;
+
+  return (
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-left text-sm">
+            <thead className="bg-white text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="w-12 px-5 py-3">
+                  <input
+                    aria-label="Selecionar todos"
+                    type="checkbox"
+                    checked={allFilteredSelected}
+                    onChange={(e) =>
+                      setSelected(
+                        e.target.checked
+                          ? [
+                              ...new Set([
+                                ...selected,
+                                ...filtered.map((i) => i.id),
+                              ]),
+                            ]
+                          : selected.filter(
+                              (id) => !filtered.some((i) => i.id === id),
+                            ),
+                      )
+                    }
+                    className="h-4 w-4 rounded border-slate-300 accent-teal-700"
+                  />
+                </th>
+                <th className="px-4 py-3">Equipamento</th>
+                <th className="px-4 py-3">Departamento</th>
+                <th className="px-4 py-3">Responsável</th>
+                <th className="px-4 py-3">Documentos</th>
+                <th className="px-4 py-3">Valor unitário</th>
+                <th className="px-4 py-3">Qtd.</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-5 py-3 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={9}
+                    className="py-16 text-center text-muted-foreground"
+                  >
+                    <LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                    Carregando equipamentos...
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-16 text-center">
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                      <ClipboardList className="h-6 w-6 text-slate-500" />
+                    </div>
+                    <p className="font-medium">
+                      Nenhum equipamento encontrado
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Altere os filtros ou cadastre um novo equipamento.
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                displayRows.map((entry) =>
+                  entry.type === "group" ? (
+                    <tr
+                      key={`group-${entry.key}`}
+                      className="border-y border-slate-200 bg-white"
+                    >
+                      <td className="px-5 py-4">
+                        <input
+                          aria-label={`Selecionar grupo ${entry.name}`}
+                          type="checkbox"
+                          checked={entry.items.every((i) =>
+                            selected.includes(i.id),
+                          )}
+                          ref={(el) => {
+                            if (el)
+                              el.indeterminate =
+                                entry.items.some((i) =>
+                                  selected.includes(i.id),
+                                ) &&
+                                !entry.items.every((i) =>
+                                  selected.includes(i.id),
+                                );
+                          }}
+                          onChange={(e) =>
+                            setSelected((old) =>
+                              e.target.checked
+                                ? [
+                                    ...new Set([
+                                      ...old,
+                                      ...entry.items.map((i) => i.id),
+                                    ]),
+                                  ]
+                                : old.filter(
+                                    (id) =>
+                                      !entry.items.some((i) => i.id === id),
+                                  ),
+                            )
+                          }
+                          className="h-4 w-4 rounded border-slate-300 accent-teal-700"
+                        />
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            aria-label={
+                              expandedGroups.includes(entry.key)
+                                ? "Recolher grupo"
+                                : "Expandir grupo"
+                            }
+                            onClick={() =>
+                              setExpandedGroups((old) =>
+                                old.includes(entry.key)
+                                  ? old.filter((k) => k !== entry.key)
+                                  : [...old, entry.key],
+                              )
+                            }
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-teal-200 bg-white text-teal-800 hover:bg-teal-100"
+                          >
+                            <ChevronDown
+                              className={`h-4 w-4 transition-transform ${expandedGroups.includes(entry.key) ? "" : "-rotate-90"}`}
+                            />
+                          </button>
+
+                          <div>
+                            <p className="font-semibold text-slate-900">
+                              {entry.name}
+                            </p>
+                            <p className="mt-0.5 text-xs text-teal-800">
+                              {entry.items.length} registros agrupados ·{" "}
+                              {entry.items.reduce(
+                                (sum, i) =>
+                                  sum + Math.max(0, Number(i.quantity) || 0),
+                                0,
+                              )}{" "}
+                              unidades
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-slate-600">
+                        {[
+                          ...new Set(entry.items.map((i) => i.department)),
+                        ].join(", ")}
+                      </td>
+                      <td className="px-4 py-4 text-slate-500">...</td>
+                      <td className="px-4 py-4 font-medium">
+                        {entry.items.filter((i) => Boolean(i.term)).length}{" "}
+                        PDF(s)
+                      </td>
+                      <td className="px-4 py-4 font-medium tabular-nums">
+                        {money(
+                          entry.items.reduce(
+                            (sum, i) =>
+                              sum +
+                              (Number(i.value) || 0) *
+                                (Number(i.quantity) || 1),
+                            0,
+                          ),
+                        )}
+                      </td>
+                      <td className="px-4 py-4 font-semibold tabular-nums">
+                        {entry.items.reduce(
+                          (sum, i) =>
+                            sum + Math.max(0, Number(i.quantity) || 0),
+                          0,
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-xs">
+                        <div className="flex flex-wrap gap-1">
+                          {statuses.map((status) => {
+                            const count = entry.items.filter(
+                              (i) => i.status === status,
+                            ).length;
+                            return count ? (
+                              <Badge
+                                key={status}
+                                className={
+                                  status === "Guardado"
+                                    ? "bg-violet-100 text-violet-800 hover:bg-violet-100"
+                                    : status === "Em Uso"
+                                      ? "bg-blue-100 text-blue-800 hover:bg-blue-100"
+                                      : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                                }
+                              >
+                                {status}: {count}
+                              </Badge>
+                            ) : null;
+                          })}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setExpandedGroups((old) =>
+                              old.includes(entry.key)
+                                ? old.filter((k) => k !== entry.key)
+                                : [...old, entry.key],
+                            )
+                          }
+                        >
+                          {expandedGroups.includes(entry.key)
+                            ? "Recolher"
+                            : "Ver unidades"}
+                        </Button>
+                      </td>
+                    </tr>
+                  ) : (
+                    (() => {
+                      const item = entry.item;
+                      return (
+                        <tr
+                          key={item.id}
+                          className={`transition-colors hover:bg-slate-50/80 ${entry.parentKey ? "bg-slate-50/60" : ""}`}
+                        >
+                          <td className="px-5 py-4">
+                            <input
+                              aria-label={`Selecionar ${item.name}`}
+                              type="checkbox"
+                              checked={selected.includes(item.id)}
+                              onChange={(e) =>
+                                setSelected((old) =>
+                                  e.target.checked
+                                    ? [...old, item.id]
+                                    : old.filter((id) => id !== item.id),
+                                )
+                              }
+                              className="h-4 w-4 rounded border-slate-300 accent-teal-700"
+                            />
+                          </td>
+                          <td
+                            className={`px-4 py-4 ${entry.parentKey ? "border-l-4 border-l-slate-200 pl-7" : ""}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              {item.image ? (
+                                <img
+                                  src={assetUrl(item.image)}
+                                  alt=""
+                                  className="h-16 w-16 rounded-lg border object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-16 w-16 items-center justify-center rounded-lg border bg-slate-50 text-slate-400">
+                                  <HardDrive className="h-5 w-5" />
+                                </div>
+                              )}
+                              <div>
+                                <p
+                                  className="max-w-[230px] truncate font-semibold text-slate-800"
+                                  title={item.name}
+                                >
+                                  {item.name}
+                                </p>
+                                {items.filter(
+                                  (x) =>
+                                    x.name
+                                      .trim()
+                                      .toLocaleLowerCase("pt-BR") ===
+                                    item.name
+                                      .trim()
+                                      .toLocaleLowerCase("pt-BR"),
+                                ).length > 1 && (
+                                  <p className="mt-1 inline-flex rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800">
+                                    Grupo ·{" "}
+                                    {
+                                      items.filter(
+                                        (x) =>
+                                          x.name
+                                            .trim()
+                                            .toLocaleLowerCase("pt-BR") ===
+                                          item.name
+                                            .trim()
+                                            .toLocaleLowerCase("pt-BR"),
+                                      ).length
+                                    }{" "}
+                                    registros
+                                  </p>
+                                )}
+                                <p className="text-xs text-slate-500">
+                                  Projeto:{" "}
+                                  {item.project
+                                    ?.split(" ")
+                                    .slice(0, 3)
+                                    .join(" ") + "..." || "Não informado"}
+                                </p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  Patrimônio: {item.patrimonio || "—"}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                              {item.department}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-slate-600">
+                            {item.responsavel || (
+                              <span className="text-slate-400">
+                                Não atribuído
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-2">
+                              {item.term ? (
+                                <a
+                                  href={assetUrl(item.term)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title="Abrir PDF"
+                                  className="flex h-8 w-8 items-center justify-center rounded-md border text-red-600 hover:bg-red-50"
+                                >
+                                  <FileText className="h-4 w-4" />
+                                </a>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 px-2 text-xs"
+                                  onClick={() => openGenerate(item)}
+                                >
+                                  <FilePlus2 className="h-3.5 w-3.5" /> Gerar
+                                  termo
+                                </Button>
+                              )}
+                              {item.image && (
+                                <a
+                                  href={assetUrl(item.image)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title="Abrir imagem"
+                                  className="flex h-8 w-8 items-center justify-center rounded-md border text-blue-600 hover:bg-blue-50"
+                                >
+                                  <ImageIcon className="h-4 w-4" />
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 font-medium tabular-nums">
+                            {money(item.value)}
+                          </td>
+
+                          <td className="px-4 py-4 tabular-nums">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7 shrink-0"
+                                title="Diminuir quantidade"
+                                aria-label={`Diminuir quantidade de ${item.name}`}
+                                onClick={() => void changeQuantity(item, -1)}
+                              >
+                                <Minus className="h-3.5 w-3.5" />
+                              </Button>
+
+                              <span className="min-w-5 text-center font-medium">
+                                {item.quantity}
+                              </span>
+
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7 shrink-0"
+                                title="Aumentar quantidade"
+                                aria-label={`Aumentar quantidade de ${item.name}`}
+                                onClick={() => void changeQuantity(item, 1)}
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-4">
+                            <Select
+                              value={item.status}
+                              onValueChange={(v) =>
+                                void updateStatus(item, v)
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-[142px] border-0 bg-transparent px-2 shadow-none focus:ring-1">
+                                <Badge
+                                  variant="secondary"
+                                  className={
+                                    item.status === "Guardado"
+                                      ? "bg-violet-100 text-violet-800 hover:bg-violet-100"
+                                      : item.status === "Em Uso"
+                                        ? "bg-blue-100 text-blue-800 hover:bg-blue-100"
+                                        : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                                  }
+                                >
+                                  {item.status}
+                                </Badge>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {statuses.map((s) => (
+                                  <SelectItem key={s} value={s}>
+                                    {s}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Duplicar registro"
+                                onClick={() => openDuplicate(item)}
+                              >
+                                <ClipboardList className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Editar"
+                                onClick={() => openEdit(item)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Excluir"
+                                onClick={() => {
+                                  setSelected([item.id]);
+                                  setDeleteOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })()
+                  ),
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+  );
+}
