@@ -37,6 +37,7 @@ function equipment(index) {
     id: `item-${index}`,
     name: `Equipamento ${String(index).padStart(3, "0")}`,
     department: "hardware",
+    patrimonio: `PAT-${index}`,
     responsavel: `Responsavel ${index}`,
     project: "Projeto Alpha",
     value: 1000 + index,
@@ -117,7 +118,11 @@ test("relatório cabe em uma página quando há poucos registros", async () => {
   assert.strictEqual(count(pages[0], "EQUIPCONTROL"), 1);
   assert.strictEqual(count(pages[0], "Registros: 5"), 1);
   assert.strictEqual(count(pages[0], "Total investido"), 1);
-  assert.strictEqual(count(pages[0], "hardware"), 5);
+
+  // Coluna de patrimônio no lugar da de departamento.
+  assert.strictEqual(count(pages[0], "Patrimônio"), 1);
+  assert.strictEqual(count(pages[0], "Departamento"), 0);
+  assert.strictEqual(count(pages[0], "\nPAT-"), 5);
 });
 
 test("relatório grande abre novas páginas em vez de desenhar por cima", async () => {
@@ -140,7 +145,7 @@ test("relatório grande abre novas páginas em vez de desenhar por cima", async 
     assert.strictEqual(count(page, "EQUIPCONTROL"), 1, `cabeçalho duplicado na página ${index + 1}`);
     assert.strictEqual(count(page, `Página ${index + 1}`), 1, `rodapé errado na página ${index + 1}`);
 
-    const rows = count(page, "\nhardware\n");
+    const rows = count(page, "\nPAT-");
     assert.ok(rows > 0 && rows <= 16, `página ${index + 1} com ${rows} linhas`);
     seen += rows;
   });

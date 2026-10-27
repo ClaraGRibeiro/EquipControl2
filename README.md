@@ -156,7 +156,7 @@ Os arquivos nunca são servidos pela rota `/uploads/*`: o Express publica apenas
 - Campo **Projeto / fonte do recurso** (ex.: FADENOR, FAPEMIG): persistido em `equipments.project`, aparece na listagem e na busca, é filtrável, vai para o Excel e alimenta o relatório PDF
 - **Termo de responsabilidade**: formulário com 11 campos obrigatórios, gera o PDF sobre o `template.pdf` e anexa ao equipamento
 - Upload de PDF e imagem com prévia dos arquivos já associados e desfazer da remoção por 3 segundos
-- **Relatório PDF do inventário** por projeto ou para todos, com paginação de tabela, contagem de registros/unidades e total investido
+- **Relatório PDF do inventário** (`inventario-<projeto>-<aaaa-mm-dd>.pdf`) por projeto ou para todos: A4 paisagem, tabela paginada com cabeçalho repetido em cada página, colunas Equipamento, Patrimônio, Responsável, Projeto / fonte, Valor unit., Qtd. e Status, resumo com contagem de registros/unidades e total investido na última página
 - **Exportação para Excel** por projeto ou para todos (os documentos entram como link, não como anexo binário)
 - Layout responsivo: no celular, as ações ficam em um menu e há botão flutuante de novo equipamento
 

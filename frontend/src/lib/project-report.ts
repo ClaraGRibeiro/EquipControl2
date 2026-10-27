@@ -29,7 +29,7 @@ export async function buildProjectReportPdf({
 
   const columns = [
     { title: "Equipamento", width: 165 },
-    { title: "Departamento", width: 82 },
+    { title: "Patrimônio", width: 82 },
     { title: "Responsável", width: 105 },
     { title: "Projeto / fonte", width: 155 },
     { title: "Valor unit.", width: 78 },
@@ -234,7 +234,7 @@ export async function buildProjectReportPdf({
 
     const values = [
       item.name || "Sem descrição",
-      item.department || "—",
+      String(item.patrimonio || "").trim() || "—",
       item.responsavel || "Não atribuído",
       (item.project || "").trim() || "Sem projeto",
       money(unitValue),
