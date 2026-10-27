@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { emptyForm } from "@/lib/constants";
+import { newEquipmentId } from "@/lib/id";
 import { readDataUrl } from "@/lib/files";
 import type { Equipment, FormValues } from "@/lib/types";
 
@@ -92,9 +93,7 @@ export function useEquipmentForm({
 
       const payload: Equipment = {
         ...form,
-        id:
-          editing?.id ||
-          `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`,
+        id: editing?.id || newEquipmentId(),
         name: form.name.trim(),
         department: form.department.trim(),
         project: form.project.trim(),

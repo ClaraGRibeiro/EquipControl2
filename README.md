@@ -56,6 +56,38 @@ Para popular com a base de exemplo, execute `seed.txt` (13 equipamentos). Ele re
 
 A coluna `project` é adicionada automaticamente na inicialização do servidor (`server.js`) quando não existir, sem apagar registros.
 
+### Inserindo registros direto no banco
+
+O site gera o `id` como base 36 do timestamp + 8 caracteres aleatórios (`mvr2csdr-96798e6f`). Para inserir pelo terminal usando o mesmo cálculo, gere o id com o script `scripts/new-id.mjs`:
+
+```bash
+npm run new-id                                   # um id
+npm run new-id -- --count 3                      # vários ids
+npm run new-id -- --sql --name "NOBREAK RAGTECH SENOIDAL NEP 3200VA" \
+  --department hardware --value 2100.00 --quantity 1 \
+  --project "Observatório Do Transportes Do Estado De Minas Gerais"
+```
+
+Com `--sql` o comando imprime o `INSERT` pronto, já com o `id` gerado, os números sem aspas e `created_at` deixado para o `DEFAULT CURRENT_TIMESTAMP`:
+
+```sql
+INSERT INTO equipments (id, name, department, value, quantity, status, patrimonio, responsavel, term, image, project)
+VALUES ('mvr41brs-2fd7492c', 'NOBREAK RAGTECH SENOIDAL NEP 3200VA', 'hardware', 2100.00, 1, 'Guardado', '', '', '', '', 'Observatório Do Transportes Do Estado De Minas Gerais');
+```
+
+Opções aceitas: `--name`, `--department`, `--value`, `--quantity`, `--status`, `--patrimonio`, `--responsavel`, `--term`, `--image` e `--project`. O cálculo fica em `frontend/src/lib/id.ts` e é replicado no script; `tests/equipment-id.test.js` falha se os dois saírem do sincronismo.
+
+Para preencher os ids de um arquivo de seed (só os valores vazios de `id`, o resto do arquivo fica intacto):
+
+```bash
+npm run new-id -- --file seed.txt        # mostra o SQL corrigido (dry-run)
+npm run new-id -- --file seed.txt --write # aplica no arquivo
+```
+
+O script lê o `INSERT` respeitando vírgulas e parênteses dentro do texto (as descrições dos equipamentos são cheias disso), avisa a linha quando falta uma `,` entre os blocos `VALUES (...)`, mantém os ids que já estão preenchidos e troca `created_at` vazio (`''`) por `CURRENT_TIMESTAMP`, porque `''` é recusado pelo MySQL/MariaDB.
+
+Cada execução gera ids novos, então rodar o seed mais de uma vez cria equipamentos duplicados.
+
 ## Instalação e desenvolvimento
 
 ```bash
@@ -74,7 +106,8 @@ O back-end sobe em `http://localhost:3000` e o Vite em `http://localhost:5173`. 
 | `npm run client:dev` | Apenas o Vite |
 | `npm run build` | Compila o front-end em `frontend/dist` |
 | `npm start` | Executa o build e inicia o Express |
-| `npm test` | Testes de `assets.js` com o runner nativo do Node (`node --test`) |
+| `npm test` | Testes de `assets.js` e do gerador de id com o runner nativo do Node (`node --test`) |
+| `npm run new-id` | Gera id no formato do site: `--sql` monta o `INSERT`, `--file seed.txt` preenche os ids vazios de um seed |
 
 ## Produção
 
