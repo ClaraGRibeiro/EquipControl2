@@ -49,12 +49,15 @@ function equipment(index) {
   };
 }
 
-// Devolve o texto desenhado em cada página (pdf-lib grava os textos em hex).
-async function pagesOf(bytes) {
+// pdf-lib grava em object streams, o que esconde os objetos: salvamos sem eles.
+async function flattenPdf(bytes) {
   const pdf = await PDFDocument.load(bytes);
   const flat = await pdf.save({ useObjectStreams: false });
-  const raw = Buffer.from(flat).toString("latin1");
+  return Buffer.from(flat).toString("latin1");
+}
 
+// Content stream descomprimido de cada página, na ordem das páginas.
+function pageStreams(raw) {
   const hexToText = (hex) => {
     let out = "";
     for (let i = 0; i + 1 < hex.length; i += 2) {
@@ -62,9 +65,6 @@ async function pagesOf(bytes) {
     }
     return out;
   };
-
-  const readText = (stream) =>
-    [...stream.matchAll(/<([0-9A-Fa-f]+)>\s*Tj/g)].map((m) => hexToText(m[1])).join("\n");
 
   const streams = new Map();
   const objRegex = /(\d+)\s+0\s+obj([\s\S]*?)endobj/g;
@@ -83,7 +83,7 @@ async function pagesOf(bytes) {
     const inflated = zlib
       .inflateSync(Buffer.from(body.slice(dataStart, dataEnd), "latin1"))
       .toString("latin1");
-    streams.set(match[1], readText(inflated));
+    streams.set(match[1], inflated);
   }
 
   const pages = [];
@@ -93,13 +93,29 @@ async function pagesOf(bytes) {
     if (!/\/Type\s*\/Page(?![s])/.test(match[2])) continue;
     const contents = /\/Contents\s*(\[[^\]]*\]|\d+\s+0\s+R)/.exec(match[2]);
     if (!contents) continue;
-    const text = [...contents[1].matchAll(/(\d+)\s+0\s+R/g)]
+    const stream = [...contents[1].matchAll(/(\d+)\s+0\s+R/g)]
       .map((ref) => streams.get(ref[1]) || "")
       .join("\n");
-    pages.push(text);
+    pages.push({ stream, resources: match[2] });
   }
 
   return pages;
+}
+
+// Devolve o texto desenhado em cada página (pdf-lib grava os textos em hex).
+async function pagesOf(bytes) {
+  return pageStreams(await flattenPdf(bytes)).map(
+    ({ stream }) =>
+      [...stream.matchAll(/<([0-9A-Fa-f]+)>\s*Tj/g)]
+        .map((m) => {
+          let out = "";
+          for (let i = 0; i + 1 < m[1].length; i += 2) {
+            out += String.fromCharCode(parseInt(m[1].slice(i, i + 2), 16));
+          }
+          return out;
+        })
+        .join("\n"),
+  );
 }
 
 const count = (text, needle) => text.split(needle).length - 1;
@@ -157,6 +173,70 @@ test("relatório grande abre novas páginas em vez de desenhar por cima", async 
   assert.strictEqual(summaries, 1);
   assert.strictEqual(count(pages.at(-1), "Total investido"), 1);
   assert.ok(count(pages.at(-1), `Registros: ${total}`) === 1);
+});
+
+test("logo entra como marca d'água em todas as páginas, atrás da tabela", async () => {
+  const { buildProjectReportPdf } = loadReportModule();
+
+  const logo = fs.readFileSync(path.join(repo, "frontend", "public", "logo.png"));
+
+  const bytes = await buildProjectReportPdf({
+    selectedItems: Array.from({ length: 20 }, (_, i) => equipment(i)),
+    reportProject: "__todos__",
+    logo,
+  });
+
+  const flat = await flattenPdf(bytes);
+  const pages = pageStreams(flat);
+
+  assert.ok(pages.length > 1, `esperava mais de uma página, veio ${pages.length}`);
+
+  // Uma única cópia do logo no arquivo: imagem + máscara de transparência.
+  assert.strictEqual(count(flat, "/Subtype /Image"), 2);
+
+  pages.forEach(({ stream, resources }, index) => {
+    const page = index + 1;
+    const draws = [...stream.matchAll(/\/[\w-]+\s+Do\b/g)];
+    assert.strictEqual(draws.length, 1, `página ${page} com ${draws.length} imagens desenhadas`);
+
+    // Alfa baixo aplicado só ao logo, via ExtGState da própria página.
+    assert.match(
+      resources.replace(/\s+/g, " "),
+      /\/ExtGState << \/[\w-]+ << \/Type \/ExtGState \/ca 0\.07 >>/,
+    );
+
+    // Desenhado antes do cabeçalho e do texto, por isso fica atrás de tudo, e o
+    // ExtGState de alfa é aplicado logo antes do desenho da imagem.
+    const imageOp = stream.search(/\/[\w-]+\s+Do\b/);
+    assert.ok(imageOp > -1, `página ${page} sem imagem desenhada`);
+    assert.match(stream.slice(0, imageOp), /\/[\w-]+\s+gs/);
+    assert.ok(imageOp < stream.search(/\brg\b/), `fundo pintado antes da marca d'água na página ${page}`);
+    assert.ok(imageOp < stream.indexOf("Tj"), `texto desenhado antes da marca d'água na página ${page}`);
+  });
+});
+
+test("relatório continua sendo gerado quando o logo não está disponível", async () => {
+  const { buildProjectReportPdf } = loadReportModule();
+
+  const bytes = await buildProjectReportPdf({
+    selectedItems: Array.from({ length: 3 }, (_, i) => equipment(i)),
+    reportProject: "__todos__",
+    logo: null,
+  });
+
+  const flat = await flattenPdf(bytes);
+  const pages = pageStreams(flat);
+
+  assert.strictEqual(count(flat, "/Subtype /Image"), 0);
+
+  pages.forEach(({ stream }) => {
+    assert.strictEqual([...stream.matchAll(/\/[\w-]+\s+Do\b/g)].length, 0);
+  });
+
+  // O conteúdo da tabela continua sendo desenhado normalmente.
+  const [page] = await pagesOf(bytes);
+  assert.strictEqual(count(page, "Registros: 3"), 1);
+  assert.strictEqual(count(page, "\nPAT-"), 3);
 });
 
 test("nome do arquivo do relatório", async () => {

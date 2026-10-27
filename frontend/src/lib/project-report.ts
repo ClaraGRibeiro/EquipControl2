@@ -1,20 +1,64 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import type { PDFImage } from "pdf-lib";
 import { money } from "./format";
 import type { Equipment } from "./types";
 
 export type ProjectReportData = {
   selectedItems: Equipment[];
   reportProject: string;
+  // Bytes do logo usado como marca d'água. Ausente ou inválido = relatório sem marca.
+  logo?: Uint8Array | null;
 };
+
+export const REPORT_LOGO_URL = "/logo.png";
+
+// Marca d'água desenhada atrás da tabela: ocupa ~85% da área útil e fica quase
+// invisível para não brigar com o texto.
+const WATERMARK_SCALE = 0.85;
+const WATERMARK_OPACITY = 0.07;
+
+let cachedLogo: Uint8Array | null = null;
+
+// Busca o logo uma vez por sessão; falha de download nunca impede o relatório.
+export async function loadReportLogo(url = REPORT_LOGO_URL): Promise<Uint8Array | null> {
+  if (cachedLogo) return cachedLogo;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`status ${response.status}`);
+
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const isPng = bytes[0] === 0x89 && bytes[1] === 0x50;
+    const isJpg = bytes[0] === 0xff && bytes[1] === 0xd8;
+
+    cachedLogo = isPng || isJpg ? bytes : null;
+  } catch {
+    cachedLogo = null;
+  }
+
+  return cachedLogo;
+}
 
 // Monta o PDF do inventário (apenas pdf-lib, sem depender do navegador).
 export async function buildProjectReportPdf({
   selectedItems,
   reportProject,
+  logo,
 }: ProjectReportData): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+  let watermark: PDFImage | null = null;
+
+  if (logo && logo.length) {
+    try {
+      const isJpg = logo[0] === 0xff && logo[1] === 0xd8;
+      watermark = isJpg ? await pdf.embedJpg(logo) : await pdf.embedPng(logo);
+    } catch {
+      watermark = null;
+    }
+  }
 
   const pageWidth = 841.89;
   const pageHeight = 595.28;
@@ -110,6 +154,27 @@ export async function buildProjectReportPdf({
     });
   };
 
+  // Logo centralizado atrás de tudo: por isso é desenhado antes do cabeçalho e
+  // das linhas da tabela.
+  const drawWatermark = () => {
+    if (!watermark) return;
+
+    const maxW = pageWidth - margin * 2;
+    const maxH = pageHeight - 40;
+    const scale =
+      Math.min(maxW / watermark.width, maxH / watermark.height) * WATERMARK_SCALE;
+    const width = watermark.width * scale;
+    const height = watermark.height * scale;
+
+    pagePdf.drawImage(watermark, {
+      x: (pageWidth - width) / 2,
+      y: (pageHeight - height) / 2,
+      width,
+      height,
+      opacity: WATERMARK_OPACITY,
+    });
+  };
+
   // Cada chamada abre uma página nova (menos a primeira, que já existe): sem
   // isso o cabeçalho e as linhas voltam para o topo e são desenhados por cima
   // do que já estava na página.
@@ -119,6 +184,8 @@ export async function buildProjectReportPdf({
     if (!firstPage) {
       pagePdf = pdf.addPage([pageWidth, pageHeight]);
     }
+
+    drawWatermark();
 
     pagePdf.drawRectangle({
       x: 0,
@@ -319,7 +386,9 @@ export function projectReportFileName({ reportProject }: ProjectReportData) {
 }
 
 export async function generateProjectReportPdf(data: ProjectReportData) {
-  const bytes = await buildProjectReportPdf(data);
+  // Sem logo explícito, usa o mesmo /logo.png que serve o ícone do site.
+  const logo = data.logo === undefined ? await loadReportLogo() : data.logo;
+  const bytes = await buildProjectReportPdf({ ...data, logo });
 
   const blob = new Blob([new Uint8Array(bytes)], {
     type: "application/pdf",
