@@ -45,7 +45,6 @@ export function InventoryHeader({
         <div className="hidden items-center gap-2 md:flex">
           <Button
             variant="outline"
-            size="sm"
             onClick={exportProjectReport}
             title="Gerar relatório PDF"
           >
