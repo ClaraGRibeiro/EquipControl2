@@ -2,14 +2,16 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { money } from "./format";
 import type { Equipment } from "./types";
 
-export async function generateProjectReportPdf({
-  selectedItems,
-  reportProject,
-}: {
+export type ProjectReportData = {
   selectedItems: Equipment[];
   reportProject: string;
-}) {
+};
 
+// Monta o PDF do inventário (apenas pdf-lib, sem depender do navegador).
+export async function buildProjectReportPdf({
+  selectedItems,
+  reportProject,
+}: ProjectReportData): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -108,8 +110,15 @@ export async function generateProjectReportPdf({
     });
   };
 
-  const drawPageHeader = () => {
+  // Cada chamada abre uma página nova (menos a primeira, que já existe): sem
+  // isso o cabeçalho e as linhas voltam para o topo e são desenhados por cima
+  // do que já estava na página.
+  const drawPageHeader = (firstPage = false) => {
     pageNumber++;
+
+    if (!firstPage) {
+      pagePdf = pdf.addPage([pageWidth, pageHeight]);
+    }
 
     pagePdf.drawRectangle({
       x: 0,
@@ -191,12 +200,13 @@ export async function generateProjectReportPdf({
   let grandTotal = 0;
   let totalQuantity = 0;
 
-  drawPageHeader();
+  drawPageHeader(true);
 
   for (const item of sortedItems) {
     if (y - rowHeight < bottomLimit) {
       drawFooter();
       drawPageHeader();
+      rowNumber = 0;
     }
 
     const quantity = Math.max(1, Number(item.quantity) || 1);
@@ -287,13 +297,13 @@ export async function generateProjectReportPdf({
 
   drawFooter();
 
-  const bytes = await pdf.save();
-  const blob = new Blob([new Uint8Array(bytes)], {
-    type: "application/pdf",
-  });
+  return pdf.save();
+}
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+// Nome do arquivo do relatório, no formato usado pelo download.
+export function projectReportFileName({ reportProject }: ProjectReportData) {
+  const projectTitle =
+    reportProject === "__todos__" ? "Todos os projetos" : reportProject;
 
   const date = new Date().toISOString().slice(0, 10);
   const safeProject = projectTitle
@@ -303,11 +313,23 @@ export async function generateProjectReportPdf({
     .replace(/^-|-$/g, "")
     .slice(0, 60);
 
+  return reportProject === "__todos__"
+    ? `inventario-todos-os-projetos-${date}.pdf`
+    : `inventario-${safeProject || "projeto"}-${date}.pdf`;
+}
+
+export async function generateProjectReportPdf(data: ProjectReportData) {
+  const bytes = await buildProjectReportPdf(data);
+
+  const blob = new Blob([new Uint8Array(bytes)], {
+    type: "application/pdf",
+  });
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+
   a.href = url;
-  a.download =
-    reportProject === "__todos__"
-      ? `inventario-todos-os-projetos-${date}.pdf`
-      : `inventario-${safeProject || "projeto"}-${date}.pdf`;
+  a.download = projectReportFileName(data);
 
   document.body.appendChild(a);
   a.click();
