@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, LoaderCircle } from "lucide-react";
 import { departments, statuses } from "@/lib/constants";
+import { shortFileName } from "@/lib/format";
 import { assetUrl } from "@/lib/files";
 import type { InventoryController } from "@/hooks/use-inventory";
 
@@ -261,13 +262,13 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
             </div>
           )}
           {termFile && (
-            <p className="text-xs text-muted-foreground">
-              PDF selecionado: {termFile.name}
+            <p className="text-xs text-muted-foreground" title={termFile.name}>
+              PDF selecionado: {shortFileName(termFile.name)}
             </p>
           )}
           {imageFile && (
-            <p className="text-xs text-muted-foreground">
-              Imagem selecionada: {imageFile.name}
+            <p className="text-xs text-muted-foreground" title={imageFile.name}>
+              Imagem selecionada: {shortFileName(imageFile.name)}
             </p>
           )}
           <div className="flex justify-end gap-2 border-t pt-4">
