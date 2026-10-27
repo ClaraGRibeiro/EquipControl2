@@ -12,10 +12,11 @@ export type ProjectReportData = {
 
 export const REPORT_LOGO_URL = "/logo.png";
 
-// Marca d'água desenhada atrás da tabela: ocupa ~85% da área útil e fica quase
-// invisível para não brigar com o texto.
-const WATERMARK_SCALE = 0.7;
-const WATERMARK_OPACITY = 0.1;
+// Marca d'água desenhada atrás da tabela: WATERMARK_SCALE é a fração da área
+// útil e WATERMARK_OPACITY controla o quanto ela aparece. Exportadas porque os
+// testes comparam o valor aplicado no PDF com o valor configurado.
+export const WATERMARK_SCALE = 0.7;
+export const WATERMARK_OPACITY = 0.1;
 
 let cachedLogo: Uint8Array | null = null;
 

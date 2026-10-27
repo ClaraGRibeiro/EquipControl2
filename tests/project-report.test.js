@@ -176,7 +176,12 @@ test("relatório grande abre novas páginas em vez de desenhar por cima", async 
 });
 
 test("logo entra como marca d'água em todas as páginas, atrás da tabela", async () => {
-  const { buildProjectReportPdf } = loadReportModule();
+  const { buildProjectReportPdf, WATERMARK_OPACITY } = loadReportModule();
+
+  assert.ok(
+    WATERMARK_OPACITY > 0 && WATERMARK_OPACITY <= 0.25,
+    "a marca d'água precisa continuar discreta",
+  );
 
   const logo = fs.readFileSync(path.join(repo, "frontend", "public", "logo.png"));
 
@@ -199,11 +204,13 @@ test("logo entra como marca d'água em todas as páginas, atrás da tabela", asy
     const draws = [...stream.matchAll(/\/[\w-]+\s+Do\b/g)];
     assert.strictEqual(draws.length, 1, `página ${page} com ${draws.length} imagens desenhadas`);
 
-    // Alfa baixo aplicado só ao logo, via ExtGState da própria página.
-    assert.match(
-      resources.replace(/\s+/g, " "),
-      /\/ExtGState << \/[\w-]+ << \/Type \/ExtGState \/ca 0\.07 >>/,
-    );
+    // Alfa baixo aplicado só ao logo, via ExtGState da própria página: o valor
+    // lido no PDF tem que ser o valor configurado no módulo.
+    const [, alpha] =
+      /\/Type \/ExtGState \/ca ([0-9.]+)/.exec(resources.replace(/\s+/g, " ")) || [];
+
+    assert.ok(alpha, `página ${page} sem ExtGState de alfa`);
+    assert.strictEqual(Number(alpha), WATERMARK_OPACITY, `alfa da página ${page} não é o configurado`);
 
     // Desenhado antes do cabeçalho e do texto, por isso fica atrás de tudo, e o
     // ExtGState de alfa é aplicado logo antes do desenho da imagem.

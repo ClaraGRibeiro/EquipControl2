@@ -158,7 +158,7 @@ Os arquivos nunca são servidos pela rota `/uploads/*`: o Express publica apenas
 - Upload de PDF e imagem com prévia dos arquivos já associados e desfazer da remoção por 3 segundos
 - **Relatório PDF do inventário** (`inventario-<projeto>-<aaaa-mm-dd>.pdf`) por projeto ou para todos: A4 paisagem, tabela paginada com cabeçalho repetido em cada página, colunas Equipamento, Patrimônio, Responsável, Projeto / fonte, Valor unit., Qtd. e Status, resumo com contagem de registros/unidades e total investido na última página
 - **Exportação para Excel** por projeto ou para todos (os documentos entram como link, não como anexo binário)
-- **Logo** em `frontend/public/logo.png`: usado como ícone do site (favicon) e como marca d'água do relatório PDF (`/ca 0.07`, desenhado antes de todo o resto em cada página); se o arquivo faltar, o relatório é gerado sem marca
+- **Logo** em `frontend/public/logo.png`: usado como ícone do site (favicon) e como marca d'água do relatório PDF (alfa `WATERMARK_OPACITY`, hoje `0.1`, desenhado antes de todo o resto em cada página); se o arquivo faltar, o relatório é gerado sem marca
 - Layout responsivo: no celular, as ações ficam em um menu e há botão flutuante de novo equipamento
 
 ## Acesso
