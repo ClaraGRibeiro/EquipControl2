@@ -32,6 +32,8 @@ import {
   HardDrive,
   Image as ImageIcon,
   LoaderCircle,
+  Menu,
+  RefreshCw,
   Minus,
   Package,
   Pencil,
@@ -222,6 +224,7 @@ function App() {
   const [loggedIn, setLoggedIn] = useState(
     () => localStorage.getItem("equipcontrol-auth") === "ok",
   );
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [reportProject, setReportProject] = useState("__todos__");
   const [excelDialogOpen, setExcelDialogOpen] = useState(false);
@@ -256,7 +259,7 @@ function App() {
   const [selected, setSelected] = useState<string[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState("10");
+  const [pageSize, setPageSize] = useState("50");
   const [bulkStatus, setBulkStatus] = useState("Guardado");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [termItem, setTermItem] = useState<Equipment | null>(null);
@@ -1293,31 +1296,108 @@ function App() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="hidden items-center gap-2 md:flex">
             <Button variant="outline" size="sm" onClick={exportProjectReport}>
-              <FileText className="h-4 w-4" /> Relatório
+              <FileText className="h-4 w-4" /> PDF
             </Button>
-            <Button
-              variant="outline"
-              onClick={exportExcel}
-              className="hidden sm:inline-flex"
-            >
-              <ArrowDownToLine className="h-4 w-4" /> Dados
+            <Button variant="outline" onClick={exportExcel}>
+              <ArrowDownToLine className="h-4 w-4" /> Excel
             </Button>
             <Button
               variant="outline"
               onClick={() => {
+                void load();
+                notify("Atualizando inventário...");
+              }}
+            >
+              <RefreshCw className="h-4 w-4" /> Atualizar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
                 localStorage.removeItem("equipcontrol-auth");
                 setLoggedIn(false);
               }}
+              className="text-white"
             >
+               <X className="h-4 w-4" />
               Sair
             </Button>
             <Button onClick={openNew}>
               <Plus className="h-4 w-4" /> Novo equipamento
             </Button>
           </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 shrink-0 md:hidden"
+            aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen((open) => !open)}
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
         </div>
+        {mobileMenuOpen && (
+          <div className="border-t bg-white px-4 py-3 shadow-lg md:hidden">
+            <div className="mx-auto grid max-w-[1440px] gap-2">
+              <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Menu de ações
+              </p>
+              <Button
+                className="w-full justify-start"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  openNew();
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" /> Novo equipamento
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  exportProjectReport();
+                }}
+              >
+                <FileText className="mr-2 h-4 w-4" /> Gerar relatório PDF
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  exportExcel();
+                }}
+              >
+                <ArrowDownToLine className="mr-2 h-4 w-4" /> Exportar dados para Excel
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  void load();
+                  notify("Atualizando inventário...");
+                }}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" /> Atualizar inventário
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-red-600 hover:text-red-700"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  localStorage.removeItem("equipcontrol-auth");
+                  setLoggedIn(false);
+                }}
+              >
+                <X className="mr-2 h-4 w-4" /> Sair da conta
+              </Button>
+            </div>
+          </div>
+        )}
       </header>
       <main className="mx-auto max-w-[1440px] space-y-6 px-4 py-7 sm:px-6 lg:px-8">
         <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
@@ -1338,7 +1418,7 @@ function App() {
             dados conectado via API
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-4 grid-cols-2">
           {[
             {
               label: "Total de itens",
@@ -1464,15 +1544,6 @@ function App() {
                   </Button>
                 </div>
               )}
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={exportExcel}
-                className="sm:hidden"
-              >
-                <ArrowDownToLine className="h-4 w-4" /> Excel
-              </Button>
             </div>
           </CardHeader>
           <div className="grid gap-3 border-b bg-slate-50/70 p-4 md:grid-cols-[minmax(220px,1fr)_200px_180px_220px]">
@@ -1735,7 +1806,7 @@ function App() {
                             ...new Set(entry.items.map((i) => i.department)),
                           ].join(", ")}
                         </td>
-                        <td className="px-4 py-4 text-slate-500">Todos</td>
+                        <td className="px-4 py-4 text-slate-500">...</td>
                         <td className="px-4 py-4 font-medium">
                           {entry.items.filter((i) => Boolean(i.term)).length}{" "}
                           PDF(s)
@@ -1883,7 +1954,7 @@ function App() {
                               </div>
                             </td>
                             <td className="px-4 py-4">
-                              <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium capitalize text-slate-700">
+                              <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
                                 {item.department}
                               </span>
                             </td>
