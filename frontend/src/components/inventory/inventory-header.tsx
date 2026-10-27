@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import {
   ArrowDownToLine,
   FileText,
+  LogOut,
   Menu,
   Package,
   Plus,
@@ -22,17 +23,10 @@ export function InventoryHeader({
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const {
-    notify,
-    items,
-    load,
-    openNew,
-    exportProjectReport,
-    exportExcel,
-  } = store;
+  const { notify, items, load, openNew, exportProjectReport, exportExcel } =
+    store;
 
   return (
-
     <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
@@ -49,11 +43,20 @@ export function InventoryHeader({
           </div>
         </div>
         <div className="hidden items-center gap-2 md:flex">
-          <Button variant="outline" size="sm" onClick={exportProjectReport}>
-            <FileText className="h-4 w-4" /> PDF
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportProjectReport}
+            title="Gerar relatório PDF"
+          >
+            <FileText className="h-4 w-4" />
           </Button>
-          <Button variant="outline" onClick={exportExcel}>
-            <ArrowDownToLine className="h-4 w-4" /> Excel
+          <Button
+            variant="outline"
+            onClick={exportExcel}
+            title="Exportar dados para Excel"
+          >
+            <ArrowDownToLine className="h-4 w-4" />
           </Button>
           <Button
             variant="outline"
@@ -61,19 +64,20 @@ export function InventoryHeader({
               void load();
               notify("Atualizando inventário...");
             }}
+            title="Atualizar inventário"
           >
-            <RefreshCw className="h-4 w-4" /> Atualizar
+            <RefreshCw className="h-4 w-4" />
           </Button>
           <Button
             variant="destructive"
             onClick={onLogout}
             className="text-white"
+            title="Sair da conta"
           >
-            <X className="h-4 w-4" />
-            Sair
+            <LogOut className="h-4 w-4" />
           </Button>
-          <Button onClick={openNew}>
-            <Plus className="h-4 w-4" /> Novo equipamento
+          <Button onClick={openNew} title="Novo equipamento">
+            <Plus className="h-4 w-4" />
           </Button>
         </div>
         <Button
@@ -146,7 +150,7 @@ export function InventoryHeader({
                 onLogout();
               }}
             >
-              <X className="mr-2 h-4 w-4" /> Sair da conta
+              <LogOut className="mr-2 h-4 w-4" /> Sair da conta
             </Button>
           </div>
         </div>
