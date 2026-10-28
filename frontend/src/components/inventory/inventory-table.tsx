@@ -391,7 +391,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                                 void updateStatus(item, v)
                               }
                             >
-                              <SelectTrigger className="h-8 w-[142px] border-0 bg-transparent px-2 shadow-none focus:ring-1">
+                              <SelectTrigger className="h-8 w-[122px] border-0 bg-transparent px-1.5 shadow-none focus:ring-1">
                                 <Badge
                                   variant="secondary"
                                   className={statusBadgeClass(item.status)}
