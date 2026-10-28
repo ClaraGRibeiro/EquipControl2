@@ -276,7 +276,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                             />
                           </td>
                           <td
-                            className={`px-4 py-4 ${entry.parentKey ? "border-l-4 border-l-slate-200 pl-7" : ""}`}
+                            className={`px-4 py-4 ${entry.parentKey ? "border-l-4 border-l-slate-200" : ""}`}
                           >
                             <div className="flex items-center gap-3">
                               {item.image ? (
