@@ -6,9 +6,7 @@ import {
   ClipboardList,
   Eye,
   FilePlus2,
-  FileText,
   HardDrive,
-  Image as ImageIcon,
   LoaderCircle,
   Pencil,
   ShieldCheck,
@@ -69,7 +67,6 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                 <th className="px-4 py-3">Equipamento</th>
                 <th className="px-4 py-3">Departamento</th>
                 <th className="px-4 py-3">Responsável</th>
-                <th className="px-4 py-3">Documentos</th>
                 <th className="px-4 py-3">Valor unitário</th>
                 <th className="px-4 py-3">Qtd.</th>
                 <th className="px-4 py-3">Status</th>
@@ -80,7 +77,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={8}
                     className="py-16 text-center text-muted-foreground"
                   >
                     <LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />
@@ -89,7 +86,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-16 text-center">
+                  <td colSpan={8} className="py-16 text-center">
                     <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
                       <ClipboardList className="h-6 w-6 text-slate-500 dark:text-slate-400" />
                     </div>
@@ -188,10 +185,6 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                         ].join(", ")}
                       </td>
                       <td className="px-4 py-4 text-slate-500 dark:text-slate-400">...</td>
-                      <td className="px-4 py-4 font-medium">
-                        {entry.items.filter((i) => Boolean(i.term)).length}{" "}
-                        PDF(s)
-                      </td>
                       <td className="px-4 py-4 font-medium tabular-nums">
                         {money(
                           entry.items.reduce(
@@ -340,42 +333,6 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-4">
-                            <div className="flex items-center gap-2">
-                              {item.term ? (
-                                <a
-                                  href={assetUrl(item.term)}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title="Abrir PDF"
-                                  className="flex h-8 w-8 items-center justify-center rounded-md border text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
-                                >
-                                  <FileText className="h-4 w-4" />
-                                </a>
-                              ) : (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 px-2 text-xs"
-                                  onClick={() => openGenerate(item)}
-                                >
-                                  <FilePlus2 className="h-3.5 w-3.5" /> Gerar
-                                  termo
-                                </Button>
-                              )}
-                              {item.image && (
-                                <a
-                                  href={assetUrl(item.image)}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title="Abrir imagem"
-                                  className="flex h-8 w-8 items-center justify-center rounded-md border text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-500/10"
-                                >
-                                  <ImageIcon className="h-4 w-4" />
-                                </a>
-                              )}
-                            </div>
-                          </td>
                           <td className="px-4 py-4 font-medium tabular-nums">
                             {money(item.value)}
                           </td>
@@ -412,6 +369,15 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                           </td>
                           <td className="px-5 py-4">
                             <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Gerar termo"
+                                aria-label={`Gerar termo de ${item.name}`}
+                                onClick={() => openGenerate(item)}
+                              >
+                                <FilePlus2 className="h-4 w-4 text-teal-700 dark:text-teal-400" />
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
