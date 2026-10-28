@@ -10,9 +10,7 @@ import {
   HardDrive,
   Image as ImageIcon,
   LoaderCircle,
-  Minus,
   Pencil,
-  Plus,
   ShieldCheck,
   Trash2,
 } from "lucide-react";
@@ -30,7 +28,6 @@ export function InventoryTable({ store }: { store: InventoryController }) {
     setDeleteOpen,
     items,
     loading,
-    changeQuantity,
     updateStatus,
     filtered,
     displayRows,
@@ -383,36 +380,8 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                             {money(item.value)}
                           </td>
 
-                          <td className="px-4 py-4 tabular-nums">
-                            <div className="flex items-center gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7 shrink-0"
-                                title="Diminuir quantidade"
-                                aria-label={`Diminuir quantidade de ${item.name}`}
-                                onClick={() => void changeQuantity(item, -1)}
-                              >
-                                <Minus className="h-3.5 w-3.5" />
-                              </Button>
-
-                              <span className="min-w-5 text-center font-medium">
-                                {item.quantity}
-                              </span>
-
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7 shrink-0"
-                                title="Aumentar quantidade"
-                                aria-label={`Aumentar quantidade de ${item.name}`}
-                                onClick={() => void changeQuantity(item, 1)}
-                              >
-                                <Plus className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
+                          <td className="px-4 py-4 font-semibold tabular-nums">
+                            {item.quantity}
                           </td>
 
                           <td className="px-4 py-4">

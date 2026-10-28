@@ -84,34 +84,6 @@ export function useEquipmentCrud({
     return () => window.clearTimeout(t);
   }, [undoAssets, discardAssetRemoval]);
 
-  async function changeQuantity(item: Equipment, delta: -1 | 1) {
-    const currentQuantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
-
-    // Ao tentar diminuir de 1 para 0, pede confirmação para excluir.
-    if (delta === -1 && currentQuantity === 1) {
-      setSelected([item.id]);
-      setDeleteOpen(true);
-      return;
-    }
-
-    const newQuantity = currentQuantity + delta;
-
-    try {
-      await api(`/api/equipments/${encodeURIComponent(item.id)}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          ...item,
-          quantity: newQuantity,
-        }),
-      });
-
-      await load();
-      notify(`Quantidade atualizada para ${newQuantity}.`);
-    } catch (e) {
-      notify(`Falha ao atualizar quantidade: ${(e as Error).message}`);
-    }
-  }
-
   async function updateStatus(item: Equipment, status: string) {
     try {
       await api(`/api/equipments/${encodeURIComponent(item.id)}`, {
@@ -251,7 +223,6 @@ export function useEquipmentCrud({
     undoItems,
     undoAssets,
     setUndoAssets,
-    changeQuantity,
     updateStatus,
     applyBulkStatus,
     deleteSelected,
