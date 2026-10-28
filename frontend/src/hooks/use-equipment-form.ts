@@ -3,15 +3,13 @@ import { api } from "@/lib/api";
 import { emptyForm } from "@/lib/constants";
 import { newEquipmentId } from "@/lib/id";
 import { readDataUrl } from "@/lib/files";
-import type { Equipment, FormValues } from "@/lib/types";
+import type { AssetRemoval, Equipment, FormValues } from "@/lib/types";
 
 type FormOptions = {
   items: Equipment[];
   load: () => Promise<void>;
   setSaving: (saving: boolean) => void;
-  setUndoAssets: (
-    assets: Array<{ item: Equipment; field: "term" | "image"; value: string }>,
-  ) => void;
+  setUndoAssets: (assets: AssetRemoval[]) => void;
   notify: (message: string) => void;
 };
 
@@ -108,17 +106,19 @@ export function useEquipmentForm({
 
       // Edição: atualiza somente o registro selecionado.
       if (editing) {
-        await api(`/api/equipments/${encodeURIComponent(editing.id)}`, {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        });
+        // O PUT devolve o lote de arquivos que foram para uploads/.trash: é por ele
+        // que o desfazer vai buscar o termo/imagem de volta.
+        const saved = await api<{ trashId?: string }>(
+          `/api/equipments/${encodeURIComponent(editing.id)}`,
+          { method: "PUT", body: JSON.stringify(payload) },
+        );
 
         const removedAssets = [
           ...(editing.term && !term
-            ? [{ item: editing, field: "term" as const, value: editing.term }]
+            ? [{ item: editing, field: "term" as const, value: editing.term, trashId: saved.trashId }]
             : []),
           ...(editing.image && !image
-            ? [{ item: editing, field: "image" as const, value: editing.image }]
+            ? [{ item: editing, field: "image" as const, value: editing.image, trashId: saved.trashId }]
             : []),
         ];
 

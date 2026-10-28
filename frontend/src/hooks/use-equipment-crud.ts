@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import type { Equipment } from "@/lib/types";
+import type { AssetRemoval, Equipment } from "@/lib/types";
 
 type CrudOptions = {
   notify: (message: string) => void;
@@ -24,9 +24,7 @@ export function useEquipmentCrud({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [undoItems, setUndoItems] = useState<Equipment[]>([]);
-  const [undoAssets, setUndoAssets] = useState<
-    Array<{ item: Equipment; field: "term" | "image"; value: string }>
-  >([]);
+  const [undoAssets, setUndoAssets] = useState<AssetRemoval[]>([]);
   // Lote de arquivos movido para uploads/.trash na última exclusão.
   const undoTrashIdRef = useRef("");
 
@@ -67,11 +65,24 @@ export function useEquipmentCrud({
     return () => window.clearTimeout(t);
   }, [undoItems, discardUndoDelete]);
 
+  // Expirado o desfazer da edição, o termo/imagem removido é apagado em definitivo.
+  const discardAssetRemoval = useCallback(() => {
+    setUndoAssets([]);
+    const trashIds = [
+      ...new Set(undoAssets.map((entry) => entry.trashId).filter(Boolean)),
+    ] as string[];
+    if (!trashIds.length) return;
+    void api("/api/equipments/trash/purge", {
+      method: "POST",
+      body: JSON.stringify({ trashIds }),
+    }).catch(() => {});
+  }, [undoAssets]);
+
   useEffect(() => {
     if (!undoAssets.length) return;
-    const t = window.setTimeout(() => setUndoAssets([]), 3000);
+    const t = window.setTimeout(discardAssetRemoval, 3000);
     return () => window.clearTimeout(t);
-  }, [undoAssets]);
+  }, [undoAssets, discardAssetRemoval]);
 
   async function changeQuantity(item: Equipment, delta: -1 | 1) {
     const currentQuantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
@@ -180,7 +191,8 @@ export function useEquipmentCrud({
     }
   }
 
-  // Desfaz a remoção de termo/imagem feita na edição, reenviando o arquivo salvo.
+  // Desfaz a remoção de termo/imagem feita na edição: primeiro os arquivos voltam de
+  // uploads/.trash, depois o PUT devolve o caminho gravado (com as validações normais).
   async function undoAssetRemoval() {
     if (!undoAssets.length) return;
     try {
@@ -192,6 +204,31 @@ export function useEquipmentCrud({
           [entry.field]: entry.value,
         });
       }
+
+      const trashIds = [
+        ...new Set(undoAssets.map((entry) => entry.trashId).filter(Boolean)),
+      ] as string[];
+      if (trashIds.length) {
+        const files = [...byId.values()].map((item) => ({
+          id: item.id,
+          term: item.term || "",
+          image: item.image || "",
+        }));
+        const lost = new Set<string>();
+        for (const trashId of trashIds) {
+          const result = await api<{ lost?: Array<{ id: string; field: "term" | "image" }> }>(
+            "/api/equipments/assets/restore",
+            { method: "POST", body: JSON.stringify({ items: files, trashId }) },
+          );
+          for (const entry of result.lost || []) lost.add(`${entry.id}:${entry.field}`);
+        }
+        // Arquivo que já saiu da lixeira não volta: manter o caminho seria link quebrado.
+        for (const [id, item] of byId) {
+          if (lost.has(`${id}:term`)) item.term = "";
+          if (lost.has(`${id}:image`)) item.image = "";
+        }
+      }
+
       for (const item of byId.values())
         await api(`/api/equipments/${encodeURIComponent(item.id)}`, {
           method: "PUT",

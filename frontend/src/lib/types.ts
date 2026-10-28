@@ -12,6 +12,14 @@ export type Equipment = {
   image?: string;
   created_at?: string;
 };
+// Remoção de termo/imagem feita na edição: o arquivo espera em uploads/.trash pelo trashId.
+export type AssetRemoval = {
+  item: Equipment;
+  field: "term" | "image";
+  value: string;
+  trashId?: string;
+};
+
 export type FormValues = {
   name: string;
   department: string;

@@ -125,7 +125,8 @@ Depois do build, acesse `http://localhost:3000`: o Express entrega os arquivos d
 |---|---|---|
 | `GET` | `/api/equipments` | Retorna todos os registros e migra automaticamente termos/imagens antigos salvos como Base64 para arquivos em disco |
 | `POST` | `/api/equipments` | Cria. Exige `id`, `name`, `department`; `responsavel` e `term` precisam vir juntos |
-| `PUT` | `/api/equipments/:id` | Atualiza. Campos `term`/`image` ausentes no corpo mantêm o valor atual; arquivos substituídos são removidos do disco |
+| `PUT` | `/api/equipments/:id` | Atualiza. Campos `term`/`image` ausentes no corpo mantêm o valor atual; o anexo que deixou de ser usado sai de `uploads/` e espera em `uploads/.trash/<trashId>/`, e a resposta devolve o `trashId` (vazio quando nenhum anexo mudou) |
+| `POST` | `/api/equipments/assets/restore` | Devolve para `uploads/` os arquivos que uma edição tirou de lá (desfazer do formulário). Corpo `{ "items": [{ "id", "term", "image" }], "trashId": "..." }`; o que já foi purgado vem em `lost` para o front não regravar link quebrado |
 | `POST` | `/api/equipments/restore` | Reinsere registros excluídos (usado pelo "Desfazer"). Corpo `{ "items": [...], "trashId": "..." }`: se enviado, os arquivos voltam da lixeira; caminhos sem arquivo são limpos antes de reinserir |
 | `POST` | `/api/equipments/trash/purge` | Apaga em definitivo os arquivos do lote informado. Corpo `{ "trashId": "..." }` (ou `trashIds: [...]`). Chamado pela interface quando o desfazer expira |
 | `DELETE` | `/api/equipments` | Corpo `{ "ids": [...] }`. Remove as linhas do banco, move os PDFs/imagens para `uploads/.trash/<trashId>/` e devolve `{ items, trashId, trashed, missing }` |
@@ -141,6 +142,8 @@ O `id` é gerado no front-end (`base36 do timestamp + sufixo aleatório`) quando
 3. Quando o desfazer expira (ou o card é fechado), a interface chama `POST /api/equipments/trash/purge` e os arquivos somem do disco.
 4. Se a aba for fechada antes disso, a varredura automática remove os lotes com mais de 15 minutos na abertura da listagem e na inicialização do servidor.
 
+A edição de um equipamento usa o mesmo depósito: quando o `PUT` grava um PDF/imagem novo (ou nenhum), o arquivo que deixou de ser usado é movido para `uploads/.trash/<trashId>/` pelo `trashReplacedAssets` de `assets.js` e o `trashId` volta na resposta. O **Desfazer** do formulário chama `POST /api/equipments/assets/restore` para trazer o arquivo de volta e depois o `PUT` devolve o caminho ao banco; expirado o prazo, a interface chama o purge. A comparação é pelo nome do arquivo, então reenviar o mesmo anexo (com ou sem barra inicial) não tira nada do lugar.
+
 Os arquivos nunca são servidos pela rota `/uploads/*`: o Express publica apenas `uploads/terms` e `uploads/images`.
 
 ## Funcionalidades
@@ -149,6 +152,7 @@ Os arquivos nunca são servidos pela rota `/uploads/*`: o Express publica apenas
 - Filtros de departamento (`hardware`, `software`, `imobiliário`), status e projeto, com paginação de 10/50/100 registros
 - Indicadores de total, em uso, guardados e em manutenção
 - Cadastro, edição, duplicação e exclusão individual ou em lote, com **desfazer por 3 segundos** (restauração via API)
+- Remover o PDF ou a imagem no formulário tira o arquivo de `uploads/` na hora, com **desfazer por 3 segundos** que devolve o arquivo e o caminho gravado
 - Cadastro duplicado: se todos os atributos coincidirem com um registro existente, a quantidade é aumentada em 1 em vez de criar um novo registro
 - Ajuste rápido de quantidade (+/−); reduzir de 1 para 0 pede confirmação de exclusão
 - Alteração de status individual ou em lote
@@ -205,7 +209,6 @@ O login (`admin` / `otmg123`) é validado **no navegador** e guardado em `localS
 - Autenticação apenas no navegador; a API fica aberta (ver aviso acima)
 - Sem lint e sem CI; os testes cobrem `assets.js` (salvar/lixeira/restaurar/purge), geração de id, formatação de texto, tema e o gerador do relatório PDF
 - `components/inventory/inventory-table.tsx` ainda reúne linha de agrupamento, linhas filhas, seleção, ajuste de quantidade e ações da linha
-- Ao **substituir/remover um anexo** na edição (rotas `PUT`), o arquivo antigo é apagado na hora: o desfazer de 3 segundos da interface devolve o caminho, mas o arquivo já não existe. A lixeira hoje é usada só na exclusão do registro
 - Atualização de status em lote dispara uma requisição `PUT` por registro; não há endpoint de lote
 - A listagem não é paginada no servidor (`SELECT *`); toda filtragem é feita no navegador
 - `db.js` usa conexão única, sem pool nem reconexão: suba o MariaDB antes do Node

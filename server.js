@@ -108,9 +108,23 @@ app.put('/api/equipments/:id', async (req, res) => {
       [body.name, body.department, body.value ?? 0, body.quantity ?? 1, body.status || 'Guardado', body.patrimonio || '', responsavel, newTermPath, newImagePath, body.project || '', id]
     );
     if (!result.affectedRows && !rows.length) return res.status(404).json({ error: 'Equipamento não encontrado.' });
-    if (oldTerm && oldTerm !== newTermPath) void assets.removeFile(oldTerm, 'terms');
-    if (oldImage && oldImage !== newImagePath) void assets.removeFile(oldImage, 'images');
-    res.json({ message: 'Equipamento atualizado com sucesso!' });
+    // O termo/imagem que deixaram de ser usados sai de uploads/ e espera na lixeira
+    // para o "Desfazer" do formulário funcionar; a lixeira nunca derruba a edição.
+    let trashId = '';
+    try {
+      trashId = assets.newTrashBatch();
+      const moved = await assets.trashReplacedAssets(
+        { id, before: { term: oldTerm, image: oldImage }, after: { term: newTermPath, image: newImagePath } },
+        trashId,
+      );
+      trashId = moved.trashId;
+    } catch (trashErr) {
+      console.error('Falha ao mover arquivos substituídos para a lixeira:', trashErr);
+      trashId = '';
+      if (oldTerm && oldTerm !== newTermPath) void assets.removeFile(oldTerm, 'terms');
+      if (oldImage && oldImage !== newImagePath) void assets.removeFile(oldImage, 'images');
+    }
+    res.json({ message: 'Equipamento atualizado com sucesso!', trashId });
   } catch (err) {
     if (newTermPath && newTermPath !== req.body.term) void assets.removeFile(newTermPath, 'terms');
     if (newImagePath && newImagePath !== req.body.image) void assets.removeFile(newImagePath, 'images');
@@ -153,6 +167,31 @@ app.post('/api/equipments/restore', async (req, res) => {
       lost,
     });
   } catch (err) { res.status(500).json({ error: err.message || 'Falha ao restaurar.' }); }
+});
+
+// Devolve para uploads/ os arquivos que uma edição tirou de lá (desfazer do formulário).
+// O banco é ajustado em seguida pelo PUT normal, que continua validando responsável+termo.
+app.post('/api/equipments/assets/restore', async (req, res) => {
+  const items = req.body?.items;
+  const trashId = req.body?.trashId;
+  if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: 'Nenhum arquivo para restaurar.' });
+  if (!isTrashBatchId(trashId)) return res.status(400).json({ error: 'Identificador de lixeira inválido.' });
+  try {
+    // Caminhos que já saíram da lixeira vêm em "lost" para o front não regravar link quebrado.
+    const lost = await assets.restoreAssets(items, trashId);
+    try {
+      await assets.purgeTrash(trashId);
+    } catch (trashErr) {
+      console.error('Falha ao limpar a lixeira após desfazer a remoção:', trashErr);
+    }
+    res.json({
+      message: lost.length ? `${lost.length} arquivo(s) já haviam saído da lixeira.` : 'Arquivos restaurados.',
+      lost,
+    });
+  } catch (err) {
+    console.error('Erro ao restaurar arquivos da edição:', err);
+    res.status(500).json({ error: err.message || 'Falha ao restaurar arquivos.' });
+  }
 });
 
 // Apaga em definitivo os arquivos do lote excluído, quando o desfazer expira.

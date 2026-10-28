@@ -144,6 +144,29 @@ function createAssetStore({ uploadsRoot, trashTtlMs = 15 * 60 * 1000 }) {
   }
 
   /**
+   * Move para a lixeira o termo/imagem que deixaram de ser usados numa edição.
+   * A comparação é pelo arquivo (nome dentro da pasta do tipo), não pela string:
+   * o mesmo anexo pode chegar com ou sem barra inicial e não deve sair de uploads/.
+   * Sem mudança de arquivo, devolve trashId vazio para o front não mostrar desfazer.
+   */
+  async function trashReplacedAssets({ id, before, after }, trashId) {
+    const nameOf = (value, kind) => {
+      const file = localPath(value, kind);
+      return file ? path.basename(file) : '';
+    };
+    const picked = { id };
+    for (const { kind, field } of ASSET_FIELDS) {
+      const oldName = nameOf(before[field] || '', kind);
+      if (!oldName) continue;
+      if (nameOf(after[field] || '', kind) === oldName) continue;
+      picked[field] = before[field];
+    }
+    if (!picked.term && !picked.image) return { trashId: '', trashed: 0, missing: 0 };
+    const { trashed, missing } = await trashAssets([picked], trashId);
+    return { trashId, trashed, missing };
+  }
+
+  /**
    * Devolve os arquivos da lixeira para uploads/<kind>/.
    * Caminhos que não têm arquivo nem na lixeira nem na pasta ativa têm o valor
    * limpo no próprio item recebido, para o banco não guardar link quebrado.
@@ -216,6 +239,7 @@ function createAssetStore({ uploadsRoot, trashTtlMs = 15 * 60 * 1000 }) {
     removeFile,
     newTrashBatch,
     trashAssets,
+    trashReplacedAssets,
     restoreAssets,
     purgeTrash,
     sweepTrash,

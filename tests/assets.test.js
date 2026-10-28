@@ -149,3 +149,76 @@ test('apenas UUID é aceito como identificador de lixeira', async () => {
   }
   await assert.rejects(() => store.purgeTrash('../../etc'), /lixeira inv\xE1lido/);
 });
+
+test('edição que remove ou troca anexo tira o arquivo antigo de uploads', async () => {
+  const oldTerm = writeActive('terms', 'antigo.pdf');
+  const oldImage = writeActive('images', 'antigo.jpg');
+  const newTerm = writeActive('terms', 'novo.pdf');
+  const trashId = store.newTrashBatch();
+
+  const result = await store.trashReplacedAssets(
+    {
+      id: 'equip-1',
+      before: { term: oldTerm, image: oldImage },
+      after: { term: newTerm, image: '' },
+    },
+    trashId,
+  );
+
+  assert.deepEqual(result, { trashId, trashed: 2, missing: 0 });
+  assert.equal(fs.existsSync(store.localPath(oldTerm, 'terms')), false);
+  assert.equal(fs.existsSync(store.localPath(oldImage, 'images')), false);
+  assert.equal(fs.existsSync(store.localPath(newTerm, 'terms')), true);
+  assert.equal(fs.existsSync(path.join(store.trashRoot, trashId, 'terms', 'antigo.pdf')), true);
+});
+
+test('edição que não mexe no anexo deixa o arquivo em uploads', async () => {
+  const term = writeActive('terms', 'em-uso.pdf');
+  const image = writeActive('images', 'em-uso.jpg');
+
+  const result = await store.trashReplacedAssets(
+    {
+      id: 'equip-1',
+      before: { term, image },
+      after: { term: term.replace(/^\//, ''), image },
+    },
+    store.newTrashBatch(),
+  );
+
+  assert.deepEqual(result, { trashId: '', trashed: 0, missing: 0 });
+  assert.equal(fs.existsSync(store.localPath(term, 'terms')), true);
+  assert.equal(fs.existsSync(store.localPath(image, 'images')), true);
+  assert.equal(fs.readdirSync(store.trashRoot).length, 0);
+});
+
+test('desfazer a remoção devolve o arquivo para uploads e o purge fecha o lote', async () => {
+  const term = writeActive('terms', 'desfazer.pdf');
+  const image = writeActive('images', 'desfazer.jpg');
+  const trashId = store.newTrashBatch();
+
+  await store.trashReplacedAssets(
+    { id: 'equip-1', before: { term, image }, after: { term: '', image: '' } },
+    trashId,
+  );
+  const lost = await store.restoreAssets([{ id: 'equip-1', term, image }], trashId);
+
+  assert.deepEqual(lost, []);
+  assert.equal(fs.existsSync(store.localPath(term, 'terms')), true);
+  assert.equal(fs.existsSync(store.localPath(image, 'images')), true);
+  assert.equal(await store.purgeTrash(trashId), 1);
+  assert.equal(fs.readdirSync(store.trashRoot).length, 0);
+});
+
+test('arquivo que já saiu da lixeira é reportado como perdido e limpo do item', async () => {
+  const term = writeActive('terms', 'perdido.pdf');
+  const trashId = store.newTrashBatch();
+
+  await store.trashReplacedAssets({ id: 'equip-1', before: { term }, after: { term: '' } }, trashId);
+  fs.rmSync(path.join(store.trashRoot, trashId, 'terms', 'perdido.pdf'));
+
+  const item = { id: 'equip-1', term };
+  const lost = await store.restoreAssets([item], trashId);
+
+  assert.deepEqual(lost, [{ id: 'equip-1', field: 'term' }]);
+  assert.equal(item.term, '');
+});
