@@ -1,5 +1,6 @@
 import { AppFooter } from "@/components/app-footer";
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog";
+import { EquipmentDetailDialog } from "@/components/dialogs/equipment-detail-dialog";
 import { EquipmentFormDialog } from "@/components/dialogs/equipment-form-dialog";
 import { ExcelDialog } from "@/components/dialogs/excel-dialog";
 import { ProjectReportDialog } from "@/components/dialogs/project-report-dialog";
@@ -98,6 +99,7 @@ function App() {
       />
 
       <EquipmentFormDialog store={store} />
+      <EquipmentDetailDialog store={store} />
       <DeleteConfirmDialog store={store} />
       <TermFormDialog store={store} />
       <ProjectReportDialog store={store} />

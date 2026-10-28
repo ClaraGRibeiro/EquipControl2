@@ -59,3 +59,29 @@ test('limite customizado reduz ainda mais o nome', () => {
   assert.equal(short.length, 24);
   assert.ok(short.endsWith('.webp'));
 });
+
+test('data do registro aparece legível em pt-BR', () => {
+  const { dateTime } = loadFormatModule();
+
+  // Sem fuso na amostra: o Date é lido no horário local, então o resultado é estável.
+  const text = dateTime('2026-02-03T10:30:00');
+  assert.ok(text.startsWith('03/02/2026'), `esperado dd/mm/aaaa, veio ${text}`);
+  assert.ok(text.includes('10:30'), 'hora:minuto visíveis');
+  assert.equal(dateTime(''), '');
+  assert.equal(dateTime(undefined), '');
+  assert.equal(dateTime('banana'), 'banana', 'valor imprestável volta como veio');
+});
+
+test('nome do arquivo vem do caminho salvo em term/image', () => {
+  const { fileName } = loadFormatModule();
+
+  assert.equal(fileName('/uploads/terms/termo-abc.pdf'), 'termo-abc.pdf');
+  assert.equal(
+    fileName('uploads/images/nota%20quebrada (1).jpg'),
+    'nota quebrada (1).jpg',
+  );
+  assert.equal(fileName('C:\\uploads\\terms\\x.pdf'), 'x.pdf');
+  assert.equal(fileName(''), '');
+  assert.equal(fileName(undefined), '');
+  assert.equal(fileName('%E2'), '%E2', 'escape quebrado não derruba o modal');
+});

@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   ChevronDown,
   ClipboardList,
+  Eye,
   FilePlus2,
   FileText,
   HardDrive,
@@ -15,7 +16,7 @@ import {
   ShieldCheck,
   Trash2,
 } from "lucide-react";
-import { statuses } from "@/lib/constants";
+import { statuses, statusBadgeClass } from "@/lib/constants";
 import { money } from "@/lib/format";
 import { assetUrl } from "@/lib/files";
 import type { InventoryController } from "@/hooks/use-inventory";
@@ -36,6 +37,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
     openEdit,
     openDuplicate,
     openGenerate,
+    openDetail,
     allFilteredSelected,
   } = store;
 
@@ -220,13 +222,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                             return count ? (
                               <Badge
                                 key={status}
-                                className={
-                                  status === "Guardado"
-                                    ? "bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-500/15 dark:text-violet-300 dark:hover:bg-violet-500/15"
-                                    : status === "Em Uso"
-                                      ? "bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/15"
-                                      : "bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/15"
-                                }
+                                className={statusBadgeClass(status)}
                               >
                                 {status}: {count}
                               </Badge>
@@ -429,13 +425,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                               <SelectTrigger className="h-8 w-[142px] border-0 bg-transparent px-2 shadow-none focus:ring-1">
                                 <Badge
                                   variant="secondary"
-                                  className={
-                                    item.status === "Guardado"
-                                      ? "bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-500/15 dark:text-violet-300 dark:hover:bg-violet-500/15"
-                                      : item.status === "Em Uso"
-                                        ? "bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/15"
-                                        : "bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/15"
-                                  }
+                                  className={statusBadgeClass(item.status)}
                                 >
                                   {item.status}
                                 </Badge>
@@ -451,6 +441,15 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                           </td>
                           <td className="px-5 py-4">
                             <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Ver detalhes"
+                                aria-label={`Ver detalhes de ${item.name}`}
+                                onClick={() => openDetail(item)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"

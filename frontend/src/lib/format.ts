@@ -19,3 +19,29 @@ export function money(value: unknown) {
     currency: "BRL",
   });
 }
+// Data legível para o detalhe do registro. Aceita o texto do MySQL, o ISO com Z
+// que a API devolve ou um Date; valor imprestável volta como veio, sem "Invalid Date".
+export function dateTime(value: unknown) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+// Último pedaço do caminho salvo em term/image, para mostrar o nome do arquivo
+// sem a barra inteira de /uploads/ na frente.
+export function fileName(path?: string) {
+  const value = String(path || "").trim();
+  if (!value) return "";
+  const last = value.split(/[\\/]/).filter(Boolean).pop() || value;
+  try {
+    return decodeURIComponent(last);
+  } catch {
+    return last;
+  }
+}

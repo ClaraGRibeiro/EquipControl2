@@ -152,6 +152,7 @@ Os arquivos nunca são servidos pela rota `/uploads/*`: o Express publica apenas
 - Filtros de departamento (`hardware`, `software`, `imobiliário`), status e projeto, com paginação de 10/50/100 registros
 - Indicadores de total, em uso, guardados e em manutenção
 - Cadastro, edição, duplicação e exclusão individual ou em lote, com **desfazer por 3 segundos** (restauração via API)
+- **Detalhe do registro** (ícone de olho na linha): modal de leitura com nome e projeto por extenso (sem corte de coluna), foto em tamanho grande — clique abre em tamanho real —, prévia do termo embutida no modal, nome dos arquivos salvos em `uploads/`, valor unitário/total, id e data de cadastro, além de atalhos para gerar termo, duplicar, editar e excluir. Registros homônimos aparecem listados e são clicáveis para navegar entre eles
 - Remover o PDF ou a imagem no formulário tira o arquivo de `uploads/` na hora, com **desfazer por 3 segundos** que devolve o arquivo e o caminho gravado
 - Cadastro duplicado: se todos os atributos coincidirem com um registro existente, a quantidade é aumentada em 1 em vez de criar um novo registro
 - Ajuste rápido de quantidade (+/−); reduzir de 1 para 0 pede confirmação de exclusão
@@ -200,14 +201,14 @@ O login (`admin` / `otmg123`) é validado **no navegador** e guardado em `localS
     └── src/
         ├── App.tsx        # Composição da tela: login, cabeçalho, tabelas e diálogos
         ├── components/    # inventory/, dialogs/, ui/, login e rodapé
-        ├── hooks/         # use-inventory (composer) + crud, termo, exportações, view
+        ├── hooks/         # use-inventory (composer) + crud, detalhe, termo, exportações, view
         └── lib/           # api, filtros, ids, Excel, termo e relatório PDF
 ```
 
 ## Limitações conhecidas
 
 - Autenticação apenas no navegador; a API fica aberta (ver aviso acima)
-- Sem lint e sem CI; os testes cobrem `assets.js` (salvar/lixeira/restaurar/purge), geração de id, formatação de texto, tema e o gerador do relatório PDF
+- Sem lint e sem CI; os testes cobrem `assets.js` (salvar/lixeira/restaurar/purge), geração de id, formatação de texto (nome de arquivo e data), tema, ordem das rotas do `server.js` e o gerador do relatório PDF
 - `components/inventory/inventory-table.tsx` ainda reúne linha de agrupamento, linhas filhas, seleção, ajuste de quantidade e ações da linha
 - Atualização de status em lote dispara uma requisição `PUT` por registro; não há endpoint de lote
 - A listagem não é paginada no servidor (`SELECT *`); toda filtragem é feita no navegador
