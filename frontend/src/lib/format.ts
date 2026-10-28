@@ -2,6 +2,19 @@ export const truncateWords = (text: string, limit = 3) => {
   const words = text.trim().split(/\s+/);
   return words.length > limit ? `${words.slice(0, limit).join(" ")}...` : text;
 };
+// Nome de responsável longo não cabe na coluna da tabela: fica o primeiro e o
+// último pedaço ("Guilherme Rocha Zuba Parrela" vira "Guilherme Parrela"). O
+// completo continua no title da célula, no formulário e no detalhe do registro.
+export function shortName(value: unknown) {
+  const words = String(value ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (words.length <= 2) return words.join(" ");
+
+  return `${words[0]} ${words[words.length - 1]}`;
+}
 // Nome de arquivo longo estoura o formulário: corta no meio mantendo o começo
 // e o final, onde ficam a identificação e a extensão.
 export function shortFileName(name: string, limit = 44) {

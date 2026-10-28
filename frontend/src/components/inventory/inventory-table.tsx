@@ -13,7 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { statuses, statusBadgeClass } from "@/lib/constants";
-import { money } from "@/lib/format";
+import { money, shortName } from "@/lib/format";
 import { assetUrl } from "@/lib/files";
 import type { InventoryController } from "@/hooks/use-inventory";
 
@@ -326,8 +326,13 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                               {item.department}
                             </span>
                           </td>
-                          <td className="px-4 py-4 text-slate-600 dark:text-slate-300">
-                            {item.responsavel || (
+                          <td
+                            className="px-4 py-4 text-slate-600 dark:text-slate-300"
+                            title={item.responsavel || undefined}
+                          >
+                            {item.responsavel ? (
+                              shortName(item.responsavel)
+                            ) : (
                               <span className="text-slate-400">
                                 Não atribuído
                               </span>

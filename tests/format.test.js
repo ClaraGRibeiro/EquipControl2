@@ -85,3 +85,24 @@ test('nome do arquivo vem do caminho salvo em term/image', () => {
   assert.equal(fileName(undefined), '');
   assert.equal(fileName('%E2'), '%E2', 'escape quebrado não derruba o modal');
 });
+
+test('responsável da tabela fica só com o primeiro e o último nome', () => {
+  const { shortName } = loadFormatModule();
+
+  assert.equal(
+    shortName('Guilherme Rocha Zuba Parrela'),
+    'Guilherme Parrela',
+    'nome composto resumido',
+  );
+  assert.equal(shortName('João Pedro da Silva Santos'), 'João Santos');
+  assert.equal(
+    shortName('   Ana   Carolina  Ferreira   '),
+    'Ana Ferreira',
+    'espaços extras não viram palavra vazia',
+  );
+  assert.equal(shortName('Maria Oliveira'), 'Maria Oliveira', 'dois nomes intactos');
+  assert.equal(shortName('Rivelino'), 'Rivelino', 'nome único intacto');
+  assert.equal(shortName(''), '');
+  assert.equal(shortName(null), '');
+  assert.equal(shortName(undefined), '');
+});
