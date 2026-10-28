@@ -131,7 +131,7 @@ Depois do build, acesse `http://localhost:3000`: o Express entrega os arquivos d
 | `POST` | `/api/equipments/trash/purge` | Apaga em definitivo os arquivos do lote informado. Corpo `{ "trashId": "..." }` (ou `trashIds: [...]`). Chamado pela interface quando o desfazer expira |
 | `DELETE` | `/api/equipments` | Corpo `{ "ids": [...] }`. Remove as linhas do banco, move os PDFs/imagens para `uploads/.trash/<trashId>/` e devolve `{ items, trashId, trashed, missing }` |
 | `GET` | `/uploads/terms/*`, `/uploads/images/*` | Arquivos estáticos |
-| `GET` | `/template.pdf` | Modelo usado na geração do termo |
+| `GET` | `/template.pdf` | Modelo usado na geração do termo. Tem rota própria lendo o `template.pdf` da raiz, registrada antes do front-end compilado: sem ela o fallback do SPA devolve `index.html` e o pdf-lib falha com "No PDF header found" |
 
 O `id` é gerado no front-end (`base36 do timestamp + sufixo aleatório`) quando não informado.
 
@@ -178,7 +178,7 @@ O login (`admin` / `otmg123`) é validado **no navegador** e guardado em `localS
 - `uploads/.trash/` é a lixeira temporária da exclusão; ela é ignorada pelo git e pode ser esvaziada manualmente
 - O banco guarda somente os caminhos nas colunas `term` e `image` (podem continuar `LONGTEXT`)
 - Faça backup do banco **e** dessas duas pastas. Em Docker, monte `uploads/` como volume persistente
-- O `template.pdf` deve permanecer na raiz para a geração de termos
+- O `template.pdf` deve permanecer na raiz para a geração de termos (a rota `GET /template.pdf` lê esse arquivo; ele não é copiado para `frontend/dist`)
 - Detalhes em [ARQUIVOS-PDF.md](ARQUIVOS-PDF.md)
 
 ## Estrutura
@@ -191,7 +191,7 @@ O login (`admin` / `otmg123`) é validado **no navegador** e guardado em `localS
 ├── seed.txt               # Dados de exemplo
 ├── template.pdf           # Modelo do termo de responsabilidade
 ├── scripts/new-id.mjs     # Gera ids no formato do site para inserir pelo terminal
-├── tests/                 # Testes (node --test): depósito de arquivos, ids, relatório PDF
+├── tests/                 # Testes (node --test): depósito de arquivos, ids, relatório PDF, tema, ordem das rotas
 ├── uploads/terms|images/  # Arquivos enviados
 └── frontend/
     ├── index.html         # Favicon, script do tema antes da pintura e o div#root montado pelo main.tsx

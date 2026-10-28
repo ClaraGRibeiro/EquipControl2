@@ -20,6 +20,16 @@ app.use(express.json({ limit: '50mb' }));
 app.use('/uploads/terms', express.static(assets.dirs.terms, { fallthrough: false, maxAge: '1d' }));
 app.use('/uploads/images', express.static(assets.dirs.images, { fallthrough: false, maxAge: '1d' }));
 const frontendDist = path.join(__dirname, 'frontend', 'dist');
+// O modelo do termo mora na raiz do repositório, então precisa de rota própria:
+// com o front-end compilado, o fallback do SPA entregava index.html em /template.pdf
+// e o pdf-lib derrubava o termo com "No PDF header found".
+app.get('/template.pdf', (req, res) => {
+  res.sendFile(path.join(__dirname, 'template.pdf'), (err) => {
+    if (!err || res.headersSent) return;
+    console.error('Falha ao servir template.pdf:', err.message);
+    res.status(404).json({ error: 'Modelo template.pdf não encontrado no servidor.' });
+  });
+});
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
 } else {
