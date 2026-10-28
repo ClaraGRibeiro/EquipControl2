@@ -159,7 +159,7 @@ Os arquivos nunca são servidos pela rota `/uploads/*`: o Express publica apenas
 - Alteração de status individual ou em lote
 - Agrupamento expandível de registros com o mesmo nome
 - Campo **Projeto / fonte do recurso** (ex.: FADENOR, FAPEMIG): persistido em `equipments.project`, aparece na listagem e na busca, é filtrável, vai para o Excel e alimenta o relatório PDF
-- **Responsável e termo**: dá para atribuir o responsável no cadastro marcando **"Anexar o termo depois"** — o equipamento é salvo sem PDF e o nome já vem preenchido no formulário de geração. Regra central em `validation.js`: todo termo **novo** exige responsável, responsável sem termo é válido. Registros antigos que já têm PDF sem responsável continuam editáveis (inclusive para trocar o status)
+- **Responsável e termo**: o responsável é um campo livre no cadastro, preenchido antes, junto ou depois do PDF — o nome já vem preenchido no formulário de geração do termo. Regra central em `validation.js`: todo termo **novo** exige responsável, responsável sem termo é válido. Registros antigos que já têm PDF sem responsável continuam editáveis (inclusive para trocar o status)
 - **Termo de responsabilidade**: formulário com 11 campos obrigatórios, gera o PDF sobre o `template.pdf` e anexa ao equipamento
 - Upload de PDF e imagem com prévia dos arquivos já associados e desfazer da remoção por 3 segundos
 - **Relatório PDF do inventário** (`inventario-<projeto>-<aaaa-mm-dd>.pdf`) por projeto ou para todos: A4 paisagem, tabela paginada com cabeçalho repetido em cada página, colunas Equipamento, Patrimônio, Responsável, Projeto / fonte, Valor unit., Qtd. e Status, resumo com contagem de registros/unidades e total investido na última página

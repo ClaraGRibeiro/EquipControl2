@@ -1,7 +1,7 @@
 // Regra de negócio do par responsável × termo de responsabilidade.
 //
-// Termo exige responsável. Responsável sozinho é permitido: ele pode ser atribuído
-// no cadastro ("Anexar o termo depois") e o PDF sair do botão Gerar termo da linha.
+// Termo exige responsável. Responsável sozinho é permitido: o PDF pode ser gerado
+// depois, pelo botão Gerar termo da linha da tabela.
 //
 // `previous` (termo/responsável que estão salvos no registro) existe por causa do
 // legado: há registros com PDF anexado e responsável vazio. Sem essa exceção,

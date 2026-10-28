@@ -26,15 +26,12 @@ export function useEquipmentForm({
   const [form, setForm] = useState<FormValues>(emptyForm);
   const [termFile, setTermFile] = useState<File | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  // "Anexar o termo depois": mantém o responsável salvo sem PDF anexado.
-  const [attachLater, setAttachLater] = useState(false);
 
   const openNew = () => {
     setEditing(null);
     setForm(emptyForm);
     setTermFile(null);
     setImageFile(null);
-    setAttachLater(false);
     setDialogOpen(true);
   };
 
@@ -56,7 +53,6 @@ export function useEquipmentForm({
     setForm(formFromItem(item));
     setTermFile(null);
     setImageFile(null);
-    setAttachLater(false);
     setDialogOpen(true);
   };
 
@@ -92,8 +88,8 @@ export function useEquipmentForm({
       return;
     }
 
-    // Único vínculo obrigatório: termo sem responsável. Responsável sem termo é o
-    // caso "anexar o termo depois", em que o PDF sai do botão Gerar termo da linha.
+    // Único vínculo obrigatório: termo sem responsável. Responsável sem termo é
+    // válido — o PDF pode ser gerado depois, no botão Gerar termo da linha.
     if (responsavelRequired && !form.responsavel.trim()) {
       notify("Todo termo de responsabilidade precisa de um responsável.");
       return;
@@ -213,8 +209,6 @@ export function useEquipmentForm({
     setTermFile,
     imageFile,
     setImageFile,
-    attachLater,
-    setAttachLater,
     responsavelRequired,
     openNew,
     openEdit,
