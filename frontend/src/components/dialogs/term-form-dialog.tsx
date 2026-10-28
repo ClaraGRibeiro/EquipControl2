@@ -48,7 +48,7 @@ export function TermFormDialog({ store }: { store: InventoryController }) {
               </Field>
             ))}
           </div>
-          <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+          <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
             O termo gerado usa um modelo predefinido como base. Confira os
             dados e o documento antes de coletar assinaturas.
           </div>

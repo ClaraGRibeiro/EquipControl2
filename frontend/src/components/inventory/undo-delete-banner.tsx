@@ -15,8 +15,8 @@ export function UndoDeleteBanner({
   return (
     <>
 
-      <div className="fixed bottom-5 right-5 z-[100] flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-lg border bg-white px-4 py-3 text-sm shadow-lg">
-        <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+      <div className="fixed bottom-5 right-5 z-[100] flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-lg border bg-white px-4 py-3 text-sm shadow-lg dark:bg-slate-900">
+        <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
         <span>Registro excluído.</span>
         <Button size="sm" variant="outline" onClick={onUndo}>
           Desfazer

@@ -186,10 +186,10 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
             </Field>
           </div>
           {(form.term || form.image) && (
-            <div className="grid gap-3 rounded-lg border bg-slate-50 p-3 sm:grid-cols-2">
+            <div className="grid gap-3 rounded-lg border bg-slate-50 p-3 sm:grid-cols-2 dark:bg-slate-800/60">
               {form.term && (
                 <div className="flex items-center gap-2 text-sm">
-                  <FileText className="h-5 w-5 text-red-600" />
+                  <FileText className="h-5 w-5 text-red-600 dark:text-red-400" />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">PDF atual</p>
                     <a
@@ -202,7 +202,7 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
                     </a>
                     <button
                       type="button"
-                      className="mt-2 block text-xs font-medium text-red-600 underline"
+                      className="mt-2 block text-xs font-medium text-red-600 underline dark:text-red-400"
                       onClick={() => {
                         if (
                           window.confirm(
@@ -240,7 +240,7 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
                     </a>
                     <button
                       type="button"
-                      className="mt-2 block text-xs font-medium text-red-600 underline"
+                      className="mt-2 block text-xs font-medium text-red-600 underline dark:text-red-400"
                       onClick={() => {
                         if (
                           window.confirm(

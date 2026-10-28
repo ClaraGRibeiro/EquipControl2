@@ -33,33 +33,33 @@ export function InventoryOverview({ store }: { store: InventoryController }) {
             value: counts.total,
             icon: Package,
             desc: "Unidades cadastradas",
-            color: "bg-slate-100 text-slate-700",
+            color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
           },
           {
             label: "Em uso",
             value: counts.inUse,
             icon: ShieldCheck,
             desc: "Unidades em utilização",
-            color: "bg-blue-50 text-blue-700",
+            color: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300",
           },
           {
             label: "Guardados",
             value: counts.stored,
             icon: Archive,
             desc: "Unidades disponíveis",
-            color: "bg-violet-100 text-violet-800",
+            color: "bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-300",
           },
           {
             label: "Em manutenção",
             value: counts.maintenance,
             icon: Wrench,
             desc: "Unidades em reparo",
-            color: "bg-amber-100 text-amber-800",
+            color: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300",
           },
         ].map((s) => {
           const Icon = s.icon;
           return (
-            <Card key={s.label} className="border-slate-200/80">
+            <Card key={s.label} className="border-slate-200/80 dark:border-slate-700/80">
               <CardContent className="flex items-center justify-between p-5">
                 <div>
                   <p className="text-sm text-muted-foreground">{s.label}</p>

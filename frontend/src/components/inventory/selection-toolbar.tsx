@@ -22,7 +22,7 @@ export function SelectionToolbar({ store }: { store: InventoryController }) {
 
   return (
 
-        <CardHeader className="gap-4 border-b bg-white sm:flex-row sm:items-center sm:justify-between">
+        <CardHeader className="gap-4 border-b bg-white sm:flex-row sm:items-center sm:justify-between dark:bg-slate-900">
           <div>
             <CardTitle className="text-base">
               Equipamentos cadastrados

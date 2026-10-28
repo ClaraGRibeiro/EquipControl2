@@ -16,11 +16,11 @@ export function LoginScreen({
   const [loginPassword, setLoginPassword] = useState("");
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-transparent">
 
       <main className="flex flex-1 items-center justify-center px-4 py-12">
         <form
-          className="w-full max-w-md space-y-5 rounded-2xl border bg-white p-8 shadow-sm"
+          className="w-full max-w-md space-y-5 rounded-2xl border bg-white p-8 shadow-sm dark:bg-card"
           onSubmit={(e) => {
             e.preventDefault();
             if (loginUser === "admin" && loginPassword === "otmg123") {
@@ -34,7 +34,7 @@ export function LoginScreen({
               <Package />
             </div>
             <h1 className="mt-4 text-2xl font-bold">EquipControl</h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               Entre para acessar o inventário do OTMG
             </p>
           </div>
@@ -58,7 +58,7 @@ export function LoginScreen({
           <Button className="w-full" type="submit">
             Entrar
           </Button>
-          <p className="text-center text-xs text-slate-500">
+          <p className="text-center text-xs text-slate-500 dark:text-slate-400">
             Acesso interno OTMG
           </p>
         </form>

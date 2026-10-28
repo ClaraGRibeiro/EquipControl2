@@ -37,7 +37,7 @@ export function ProjectReportDialog({ store }: { store: InventoryController }) {
         </div>
 
         <div className="grid gap-2">
-          <label className="text-sm font-medium text-slate-700">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
             Projeto / fonte do recurso
           </label>
 
@@ -67,14 +67,14 @@ export function ProjectReportDialog({ store }: { store: InventoryController }) {
           </Select>
         </div>
 
-        <div className="rounded-lg border bg-slate-50 p-3 text-sm">
-          <p className="font-medium text-slate-800">
+        <div className="rounded-lg border bg-slate-50 p-3 text-sm dark:bg-slate-800/60">
+          <p className="font-medium text-slate-800 dark:text-slate-100">
             {reportProject === "__todos__"
               ? "Inventário completo"
               : reportProject}
           </p>
 
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             {
               items.filter(
                 (item) =>

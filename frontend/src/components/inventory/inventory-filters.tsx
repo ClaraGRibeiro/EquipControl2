@@ -20,21 +20,21 @@ export function InventoryFilters({ store }: { store: InventoryController }) {
 
   return (
 
-        <div className="grid gap-3 border-b bg-slate-50/70 p-4 md:grid-cols-[minmax(220px,1fr)_200px_180px_220px]">
+        <div className="grid gap-3 border-b bg-slate-50/70 p-4 md:grid-cols-[minmax(220px,1fr)_200px_180px_220px] dark:bg-slate-800/60">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar por equipamento, patrimônio ou responsável..."
-              className="bg-white pl-9 pr-9"
+              className="bg-white pl-9 pr-9 dark:bg-slate-900"
             />
             {query && (
               <button
                 type="button"
                 aria-label="Limpar pesquisa"
                 onClick={() => setQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               >
                 <X className="h-4 w-4" />
               </button>

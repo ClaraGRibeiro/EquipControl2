@@ -160,6 +160,7 @@ Os arquivos nunca são servidos pela rota `/uploads/*`: o Express publica apenas
 - **Exportação para Excel** por projeto ou para todos (os documentos entram como link, não como anexo binário)
 - **Logo** em `frontend/public/logo.png`: usado como ícone do site (favicon) e como marca d'água do relatório PDF (alfa `WATERMARK_OPACITY`, hoje `0.1`, desenhado antes de todo o resto em cada página); se o arquivo faltar, o relatório é gerado sem marca
 - Layout responsivo: no celular, as ações ficam em um menu e há botão flutuante de novo equipamento
+- **Tema claro/escuro**: botão Sol/Lua no cabeçalho (e no menu do celular). A escolha fica em `localStorage` com a chave `equipcontrol-theme`; sem escolha salva, o app segue o `prefers-color-scheme` do sistema. O `index.html` aplica a classe `.dark` no `<html>` antes da primeira pintura (não pisca o tema claro) e os tokens HSL de `frontend/src/index.css` trocam juntos — cores fixas dos componentes usam variante `dark:`
 
 ## Acesso
 
@@ -189,7 +190,7 @@ O login (`admin` / `otmg123`) é validado **no navegador** e guardado em `localS
 ├── tests/                 # Testes (node --test): depósito de arquivos, ids, relatório PDF
 ├── uploads/terms|images/  # Arquivos enviados
 └── frontend/
-    ├── index.html         # Favicon e o div#root montado pelo main.tsx
+    ├── index.html         # Favicon, script do tema antes da pintura e o div#root montado pelo main.tsx
     ├── public/logo.png    # Logo: ícone do site e marca d'água do relatório
     ├── vite.config.ts
     └── src/
@@ -202,8 +203,8 @@ O login (`admin` / `otmg123`) é validado **no navegador** e guardado em `localS
 ## Limitações conhecidas
 
 - Autenticação apenas no navegador; a API fica aberta (ver aviso acima)
-- Sem lint e sem CI; os testes cobrem apenas o `assets.js` (salvar/lixeira/restaurar/purge)
-- `frontend/src/App.tsx` concentra em um único componente a tela, os formulários, o termo, o PDF e o Excel
+- Sem lint e sem CI; os testes cobrem `assets.js` (salvar/lixeira/restaurar/purge), geração de id, formatação de texto, tema e o gerador do relatório PDF
+- `components/inventory/inventory-table.tsx` ainda reúne linha de agrupamento, linhas filhas, seleção, ajuste de quantidade e ações da linha
 - Ao **substituir/remover um anexo** na edição (rotas `PUT`), o arquivo antigo é apagado na hora: o desfazer de 3 segundos da interface devolve o caminho, mas o arquivo já não existe. A lixeira hoje é usada só na exclusão do registro
 - Atualização de status em lote dispara uma requisição `PUT` por registro; não há endpoint de lote
 - A listagem não é paginada no servidor (`SELECT *`); toda filtragem é feita no navegador

@@ -43,7 +43,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-left text-sm">
-            <thead className="bg-white text-xs uppercase tracking-wide text-slate-500">
+            <thead className="bg-white text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
               <tr>
                 <th className="w-12 px-5 py-3">
                   <input
@@ -64,7 +64,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                             ),
                       )
                     }
-                    className="h-4 w-4 rounded border-slate-300 accent-teal-700"
+                    className="h-4 w-4 rounded border-slate-300 accent-teal-700 dark:border-slate-600 dark:accent-teal-400"
                   />
                 </th>
                 <th className="px-4 py-3">Equipamento</th>
@@ -77,7 +77,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                 <th className="px-5 py-3 text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
+            <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
               {loading ? (
                 <tr>
                   <td
@@ -91,8 +91,8 @@ export function InventoryTable({ store }: { store: InventoryController }) {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-16 text-center">
-                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                      <ClipboardList className="h-6 w-6 text-slate-500" />
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                      <ClipboardList className="h-6 w-6 text-slate-500 dark:text-slate-400" />
                     </div>
                     <p className="font-medium">
                       Nenhum equipamento encontrado
@@ -107,7 +107,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                   entry.type === "group" ? (
                     <tr
                       key={`group-${entry.key}`}
-                      className="border-y border-slate-200 bg-white"
+                      className="border-y border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
                     >
                       <td className="px-5 py-4">
                         <input
@@ -141,7 +141,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                                   ),
                             )
                           }
-                          className="h-4 w-4 rounded border-slate-300 accent-teal-700"
+                          className="h-4 w-4 rounded border-slate-300 accent-teal-700 dark:border-slate-600 dark:accent-teal-400"
                         />
                       </td>
                       <td className="px-4 py-4">
@@ -160,7 +160,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                                   : [...old, entry.key],
                               )
                             }
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-teal-200 bg-white text-teal-800 hover:bg-teal-100"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-teal-200 bg-white text-teal-800 hover:bg-teal-100 dark:border-teal-800 dark:bg-slate-900 dark:text-teal-300 dark:hover:bg-teal-500/15"
                           >
                             <ChevronDown
                               className={`h-4 w-4 transition-transform ${expandedGroups.includes(entry.key) ? "" : "-rotate-90"}`}
@@ -168,10 +168,10 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                           </button>
 
                           <div>
-                            <p className="font-semibold text-slate-900">
+                            <p className="font-semibold text-slate-900 dark:text-slate-50">
                               {entry.name}
                             </p>
-                            <p className="mt-0.5 text-xs text-teal-800">
+                            <p className="mt-0.5 text-xs text-teal-800 dark:text-teal-300">
                               {entry.items.length} registros agrupados ·{" "}
                               {entry.items.reduce(
                                 (sum, i) =>
@@ -183,12 +183,12 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-slate-600">
+                      <td className="px-4 py-4 text-slate-600 dark:text-slate-300">
                         {[
                           ...new Set(entry.items.map((i) => i.department)),
                         ].join(", ")}
                       </td>
-                      <td className="px-4 py-4 text-slate-500">...</td>
+                      <td className="px-4 py-4 text-slate-500 dark:text-slate-400">...</td>
                       <td className="px-4 py-4 font-medium">
                         {entry.items.filter((i) => Boolean(i.term)).length}{" "}
                         PDF(s)
@@ -222,10 +222,10 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                                 key={status}
                                 className={
                                   status === "Guardado"
-                                    ? "bg-violet-100 text-violet-800 hover:bg-violet-100"
+                                    ? "bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-500/15 dark:text-violet-300 dark:hover:bg-violet-500/15"
                                     : status === "Em Uso"
-                                      ? "bg-blue-100 text-blue-800 hover:bg-blue-100"
-                                      : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                                      ? "bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/15"
+                                      : "bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/15"
                                 }
                               >
                                 {status}: {count}
@@ -258,7 +258,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                       return (
                         <tr
                           key={item.id}
-                          className={`transition-colors hover:bg-slate-50/80 ${entry.parentKey ? "bg-slate-50/60" : ""}`}
+                          className={`transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/60 ${entry.parentKey ? "bg-slate-50/60 dark:bg-slate-800/50" : ""}`}
                         >
                           <td className="px-5 py-4">
                             <input
@@ -272,11 +272,11 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                                     : old.filter((id) => id !== item.id),
                                 )
                               }
-                              className="h-4 w-4 rounded border-slate-300 accent-teal-700"
+                              className="h-4 w-4 rounded border-slate-300 accent-teal-700 dark:border-slate-600 dark:accent-teal-400"
                             />
                           </td>
                           <td
-                            className={`px-4 py-4 ${entry.parentKey ? "border-l-4 border-l-slate-200" : ""}`}
+                            className={`px-4 py-4 ${entry.parentKey ? "border-l-4 border-l-slate-200 dark:border-l-slate-700" : ""}`}
                           >
                             <div className="flex items-center gap-3">
                               {item.image ? (
@@ -286,13 +286,13 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                                   className="h-16 w-16 rounded-lg border object-cover"
                                 />
                               ) : (
-                                <div className="flex h-16 w-16 items-center justify-center rounded-lg border bg-slate-50 text-slate-400">
+                                <div className="flex h-16 w-16 items-center justify-center rounded-lg border bg-slate-50 text-slate-400 dark:bg-slate-800/60 dark:text-slate-500">
                                   <HardDrive className="h-5 w-5" />
                                 </div>
                               )}
                               <div>
                                 <p
-                                  className="max-w-[230px] truncate font-semibold text-slate-800"
+                                  className="max-w-[230px] truncate font-semibold text-slate-800 dark:text-slate-100"
                                   title={item.name}
                                 >
                                   {item.name}
@@ -306,7 +306,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                                       .trim()
                                       .toLocaleLowerCase("pt-BR"),
                                 ).length > 1 && (
-                                  <p className="mt-1 inline-flex rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800">
+                                  <p className="mt-1 inline-flex rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800 dark:bg-teal-500/10 dark:text-teal-300">
                                     Grupo ·{" "}
                                     {
                                       items.filter(
@@ -322,7 +322,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                                     registros
                                   </p>
                                 )}
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
                                   Projeto:{" "}
                                   {item.project
                                     ?.split(" ")
@@ -336,11 +336,11 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                             </div>
                           </td>
                           <td className="px-4 py-4">
-                            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                               {item.department}
                             </span>
                           </td>
-                          <td className="px-4 py-4 text-slate-600">
+                          <td className="px-4 py-4 text-slate-600 dark:text-slate-300">
                             {item.responsavel || (
                               <span className="text-slate-400">
                                 Não atribuído
@@ -355,7 +355,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                                   target="_blank"
                                   rel="noreferrer"
                                   title="Abrir PDF"
-                                  className="flex h-8 w-8 items-center justify-center rounded-md border text-red-600 hover:bg-red-50"
+                                  className="flex h-8 w-8 items-center justify-center rounded-md border text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
                                 >
                                   <FileText className="h-4 w-4" />
                                 </a>
@@ -376,7 +376,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                                   target="_blank"
                                   rel="noreferrer"
                                   title="Abrir imagem"
-                                  className="flex h-8 w-8 items-center justify-center rounded-md border text-blue-600 hover:bg-blue-50"
+                                  className="flex h-8 w-8 items-center justify-center rounded-md border text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-500/10"
                                 >
                                   <ImageIcon className="h-4 w-4" />
                                 </a>
@@ -431,10 +431,10 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                                   variant="secondary"
                                   className={
                                     item.status === "Guardado"
-                                      ? "bg-violet-100 text-violet-800 hover:bg-violet-100"
+                                      ? "bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-500/15 dark:text-violet-300 dark:hover:bg-violet-500/15"
                                       : item.status === "Em Uso"
-                                        ? "bg-blue-100 text-blue-800 hover:bg-blue-100"
-                                        : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                                        ? "bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/15"
+                                        : "bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/15"
                                   }
                                 >
                                   {item.status}
@@ -476,7 +476,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                                   setDeleteOpen(true);
                                 }}
                               >
-                                <Trash2 className="h-4 w-4 text-red-600" />
+                                <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
                               </Button>
                             </div>
                           </td>

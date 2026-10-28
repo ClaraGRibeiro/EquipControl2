@@ -16,7 +16,7 @@ export function InventoryPagination({ store }: { store: InventoryController }) {
 
   return (
 
-        <div className="flex flex-col gap-3 border-t bg-white px-5 py-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-t bg-white px-5 py-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between dark:bg-slate-900">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
             <span>
               Exibindo{" "}
@@ -28,7 +28,7 @@ export function InventoryPagination({ store }: { store: InventoryController }) {
             <div className="flex items-center gap-2">
               <span className="whitespace-nowrap">Registros por página:</span>
               <Select value={pageSize} onValueChange={setPageSize}>
-                <SelectTrigger className="h-8 w-[80px] bg-white">
+                <SelectTrigger className="h-8 w-[80px] bg-white dark:bg-slate-900">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

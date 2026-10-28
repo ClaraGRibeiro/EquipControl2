@@ -16,11 +16,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Toast } from "@/components/ui/toast";
 import { useInventory } from "@/hooks/use-inventory";
+import { useTheme } from "@/hooks/use-theme";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
 function App() {
   const store = useInventory();
+  const { theme, toggleTheme } = useTheme();
   const [loggedIn, setLoggedIn] = useState(
     () => localStorage.getItem("equipcontrol-auth") === "ok",
   );
@@ -56,6 +58,8 @@ function App() {
     <div className="min-h-screen">
       <InventoryHeader
         store={store}
+        theme={theme}
+        onToggleTheme={toggleTheme}
         onLogout={() => {
           localStorage.removeItem("equipcontrol-auth");
           setLoggedIn(false);
@@ -65,14 +69,14 @@ function App() {
       <main className="mx-auto max-w-[1440px] space-y-6 px-4 py-7 sm:px-6 lg:px-8">
         <InventoryOverview store={store} />
 
-        <Card className="overflow-hidden border-slate-200/80">
+        <Card className="overflow-hidden border-slate-200/80 dark:border-slate-700/80">
           <SelectionToolbar store={store} />
           <InventoryFilters store={store} />
           <InventoryTable store={store} />
           <InventoryPagination store={store} />
         </Card>
 
-        <div className="flex items-center justify-between rounded-xl border border-dashed bg-white/60 px-4 py-3 text-xs text-muted-foreground">
+        <div className="flex items-center justify-between rounded-xl border border-dashed bg-white/60 px-4 py-3 text-xs text-muted-foreground dark:bg-slate-900/60">
           <span>EquipControl — Inventário de equipamentos</span>
           <span className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-emerald-500" /> API REST ·

@@ -12,14 +12,20 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { InventoryController } from "@/hooks/use-inventory";
+import type { Theme } from "@/lib/theme";
 
 export function InventoryHeader({
   store,
   onLogout,
+  theme,
+  onToggleTheme,
 }: {
   store: InventoryController;
   onLogout: () => void;
+  theme: Theme;
+  onToggleTheme: () => void;
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -27,7 +33,7 @@ export function InventoryHeader({
     store;
 
   return (
-    <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur dark:bg-slate-900/90">
       <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
@@ -67,6 +73,7 @@ export function InventoryHeader({
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
+          <ThemeToggle theme={theme} onToggle={onToggleTheme} />
           <Button
             variant="destructive"
             onClick={onLogout}
@@ -95,9 +102,9 @@ export function InventoryHeader({
         </Button>
       </div>
       {mobileMenuOpen && (
-        <div className="border-t bg-white px-4 py-3 shadow-lg md:hidden">
+        <div className="border-t bg-white px-4 py-3 shadow-lg md:hidden dark:bg-slate-900">
           <div className="mx-auto grid max-w-[1440px] gap-2">
-            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Menu de ações
             </p>
             <Button
@@ -141,9 +148,15 @@ export function InventoryHeader({
             >
               <RefreshCw className="mr-2 h-4 w-4" /> Atualizar inventário
             </Button>
+            <ThemeToggle
+              theme={theme}
+              onToggle={onToggleTheme}
+              withLabel
+              className="w-full justify-start"
+            />
             <Button
               variant="outline"
-              className="w-full justify-start text-red-600 hover:text-red-700"
+              className="w-full justify-start text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
               onClick={() => {
                 setMobileMenuOpen(false);
                 onLogout();
