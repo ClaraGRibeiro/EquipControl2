@@ -23,6 +23,9 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
     setTermFile,
     imageFile,
     setImageFile,
+    attachLater,
+    setAttachLater,
+    responsavelRequired,
     saveEquipment,
   } = store;
 
@@ -35,8 +38,8 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
             {editing ? "Editar equipamento" : "Novo equipamento"}
           </DialogTitle>
           <DialogDescription className="mt-1">
-            Preencha os dados do item. O responsável é obrigatório quando
-            houver termo anexado.
+            Preencha os dados do item. Todo termo precisa de um responsável, mas
+            o responsável pode ser atribuído agora e o termo anexado depois.
           </DialogDescription>
         </div>
         <form onSubmit={saveEquipment} className="grid gap-4">
@@ -140,15 +143,12 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
                 placeholder="Número de patrimônio"
               />
             </Field>
-            <Field
-              label="Responsável"
-              required={Boolean(form.term || termFile)}
-            >
+            <Field label="Responsável" required={responsavelRequired}>
               <Input
                 value={form.responsavel}
                 onChange={(e) => setField("responsavel", e.target.value)}
                 placeholder="Nome do responsável"
-                required={Boolean(form.term || termFile)}
+                required={responsavelRequired}
               />
             </Field>
             <Field label="Status">
@@ -172,10 +172,32 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
               <Input
                 type="file"
                 accept="application/pdf,.pdf"
-                className="h-auto py-2"
+                className="h-auto py-2 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={attachLater}
                 onChange={(e) => setTermFile(e.target.files?.[0] || null)}
               />
             </Field>
+            {!form.term && !termFile && (
+              <label className="flex items-start gap-2 rounded-lg border border-dashed bg-slate-50 p-3 text-sm sm:col-span-2 dark:border-slate-700 dark:bg-slate-800/60">
+                <input
+                  type="checkbox"
+                  checked={attachLater}
+                  onChange={(e) => {
+                    setAttachLater(e.target.checked);
+                    if (e.target.checked) setTermFile(null);
+                  }}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-teal-700 dark:accent-teal-400"
+                />
+                <span>
+                  <span className="font-medium">Anexar o termo depois</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Salva o equipamento com o responsável atribuído e nenhum PDF.
+                    Depois é só usar “Gerar termo” na linha: o nome do
+                    responsável já vem preenchido.
+                  </span>
+                </span>
+              </label>
+            )}
             <Field label="Imagem do equipamento">
               <Input
                 type="file"

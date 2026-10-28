@@ -106,7 +106,7 @@ O back-end sobe em `http://localhost:3000` e o Vite em `http://localhost:5173`. 
 | `npm run client:dev` | Apenas o Vite |
 | `npm run build` | Compila o front-end em `frontend/dist` |
 | `npm start` | Executa o build e inicia o Express |
-| `npm test` | Testes de `assets.js` e do gerador de id com o runner nativo do Node (`node --test`) |
+| `npm test` | Testes de `assets.js`, `validation.js` e do gerador de id com o runner nativo do Node (`node --test`) |
 | `npm run new-id` | Gera id no formato do site: `--sql` monta o `INSERT`, `--file seed.txt` preenche os ids vazios de um seed |
 
 ## Produção
@@ -124,8 +124,8 @@ Depois do build, acesse `http://localhost:3000`: o Express entrega os arquivos d
 | Método | Rota | Observações |
 |---|---|---|
 | `GET` | `/api/equipments` | Retorna todos os registros e migra automaticamente termos/imagens antigos salvos como Base64 para arquivos em disco |
-| `POST` | `/api/equipments` | Cria. Exige `id`, `name`, `department`; `responsavel` e `term` precisam vir juntos |
-| `PUT` | `/api/equipments/:id` | Atualiza. Campos `term`/`image` ausentes no corpo mantêm o valor atual; o anexo que deixou de ser usado sai de `uploads/` e espera em `uploads/.trash/<trashId>/`, e a resposta devolve o `trashId` (vazio quando nenhum anexo mudou) |
+| `POST` | `/api/equipments` | Cria. Exige `id`, `name`, `department`. Validação de `validation.js`: todo termo exige responsável; **responsável sem termo é aceito** (é o caso "anexar o termo depois") |
+| `PUT` | `/api/equipments/:id` | Atualiza. Campos `term`/`image` ausentes no corpo mantêm o valor atual; o anexo que deixou de ser usado sai de `uploads/` e espera em `uploads/.trash/<trashId>/`, e a resposta devolve o `trashId` (vazio quando nenhum anexo mudou). A regra do responsável só é cobrada quando o **termo muda**: registro legado que já está salvo com PDF e responsável vazio continua editável (inclusive para trocar o status na tabela) |
 | `POST` | `/api/equipments/assets/restore` | Devolve para `uploads/` os arquivos que uma edição tirou de lá (desfazer do formulário). Corpo `{ "items": [{ "id", "term", "image" }], "trashId": "..." }`; o que já foi purgado vem em `lost` para o front não regravar link quebrado |
 | `POST` | `/api/equipments/restore` | Reinsere registros excluídos (usado pelo "Desfazer"). Corpo `{ "items": [...], "trashId": "..." }`: se enviado, os arquivos voltam da lixeira; caminhos sem arquivo são limpos antes de reinserir |
 | `POST` | `/api/equipments/trash/purge` | Apaga em definitivo os arquivos do lote informado. Corpo `{ "trashId": "..." }` (ou `trashIds: [...]`). Chamado pela interface quando o desfazer expira |
@@ -159,6 +159,7 @@ Os arquivos nunca são servidos pela rota `/uploads/*`: o Express publica apenas
 - Alteração de status individual ou em lote
 - Agrupamento expandível de registros com o mesmo nome
 - Campo **Projeto / fonte do recurso** (ex.: FADENOR, FAPEMIG): persistido em `equipments.project`, aparece na listagem e na busca, é filtrável, vai para o Excel e alimenta o relatório PDF
+- **Responsável e termo**: dá para atribuir o responsável no cadastro marcando **"Anexar o termo depois"** — o equipamento é salvo sem PDF e o nome já vem preenchido no formulário de geração. Regra central em `validation.js`: todo termo **novo** exige responsável, responsável sem termo é válido. Registros antigos que já têm PDF sem responsável continuam editáveis (inclusive para trocar o status)
 - **Termo de responsabilidade**: formulário com 11 campos obrigatórios, gera o PDF sobre o `template.pdf` e anexa ao equipamento
 - Upload de PDF e imagem com prévia dos arquivos já associados e desfazer da remoção por 3 segundos
 - **Relatório PDF do inventário** (`inventario-<projeto>-<aaaa-mm-dd>.pdf`) por projeto ou para todos: A4 paisagem, tabela paginada com cabeçalho repetido em cada página, colunas Equipamento, Patrimônio, Responsável, Projeto / fonte, Valor unit., Qtd. e Status, resumo com contagem de registros/unidades e total investido na última página
@@ -187,12 +188,13 @@ O login (`admin` / `otmg123`) é validado **no navegador** e guardado em `localS
 ```
 .
 ├── server.js              # API Express, uploads e estáticos
+├── validation.js          # Regras de negócio validadas pela API (responsável × termo)
 ├── assets.js              # Depósito de arquivos: salvar, lixeira, restaurar, purge
 ├── db.js                  # Conexão MariaDB (mysql2)
 ├── seed.txt               # Dados de exemplo
 ├── template.pdf           # Modelo do termo de responsabilidade
 ├── scripts/new-id.mjs     # Gera ids no formato do site para inserir pelo terminal
-├── tests/                 # Testes (node --test): depósito de arquivos, ids, relatório PDF, tema, ordem das rotas
+├── tests/                 # Testes (node --test): depósito de arquivos, ids, validação, relatório PDF, tema, ordem das rotas
 ├── uploads/terms|images/  # Arquivos enviados
 └── frontend/
     ├── index.html         # Favicon, script do tema antes da pintura e o div#root montado pelo main.tsx
@@ -208,7 +210,7 @@ O login (`admin` / `otmg123`) é validado **no navegador** e guardado em `localS
 ## Limitações conhecidas
 
 - Autenticação apenas no navegador; a API fica aberta (ver aviso acima)
-- Sem lint e sem CI; os testes cobrem `assets.js` (salvar/lixeira/restaurar/purge), geração de id, formatação de texto (nome de arquivo e data), tema, ordem das rotas do `server.js` e o gerador do relatório PDF
+- Sem lint e sem CI; os testes cobrem `assets.js` (salvar/lixeira/restaurar/purge), `validation.js` (responsável × termo, inclusive o legado), geração de id, formatação de texto (nome de arquivo e data), tema, ordem das rotas do `server.js` e o gerador do relatório PDF
 - `components/inventory/inventory-table.tsx` ainda reúne linha de agrupamento, linhas filhas, seleção e ações da linha
 - Atualização de status em lote dispara uma requisição `PUT` por registro; não há endpoint de lote
 - A listagem não é paginada no servidor (`SELECT *`); toda filtragem é feita no navegador

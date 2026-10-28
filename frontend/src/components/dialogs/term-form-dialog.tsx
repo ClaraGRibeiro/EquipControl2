@@ -34,6 +34,15 @@ export function TermFormDialog({ store }: { store: InventoryController }) {
             Todos os campos abaixo são obrigatórios. O PDF gerado será anexado
             ao equipamento: {termItem?.name}.
           </DialogDescription>
+          {termItem?.responsavel && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Responsável já preenchido a partir do cadastro:{" "}
+              <span className="font-medium text-slate-700 dark:text-slate-200">
+                {termItem.responsavel}
+              </span>
+              .
+            </p>
+          )}
         </div>
         <form onSubmit={generateTerm} className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">

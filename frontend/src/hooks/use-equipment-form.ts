@@ -26,12 +26,15 @@ export function useEquipmentForm({
   const [form, setForm] = useState<FormValues>(emptyForm);
   const [termFile, setTermFile] = useState<File | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  // "Anexar o termo depois": mantém o responsável salvo sem PDF anexado.
+  const [attachLater, setAttachLater] = useState(false);
 
   const openNew = () => {
     setEditing(null);
     setForm(emptyForm);
     setTermFile(null);
     setImageFile(null);
+    setAttachLater(false);
     setDialogOpen(true);
   };
 
@@ -53,6 +56,7 @@ export function useEquipmentForm({
     setForm(formFromItem(item));
     setTermFile(null);
     setImageFile(null);
+    setAttachLater(false);
     setDialogOpen(true);
   };
 
@@ -68,6 +72,18 @@ export function useEquipmentForm({
     value: FormValues[K],
   ) => setForm((old) => ({ ...old, [key]: value }));
 
+  // Espelha validation.js: só o termo NOVO exige responsável. Um registro que já
+  // estava salvo com o mesmo termo e sem responsável (herança dos cadastros
+  // antigos) não pode travar a edição — nem a troca de status na tabela.
+  const legadoSemResponsavel = Boolean(
+    editing &&
+      editing.term &&
+      !String(editing.responsavel || "").trim() &&
+      form.term === editing.term,
+  );
+  const responsavelRequired =
+    Boolean(termFile) || (Boolean(form.term) && !legadoSemResponsavel);
+
   async function saveEquipment(event: React.FormEvent) {
     event.preventDefault();
 
@@ -76,10 +92,10 @@ export function useEquipmentForm({
       return;
     }
 
-    if (Boolean(form.responsavel.trim()) !== Boolean(termFile || form.term)) {
-      notify(
-        "Responsável e termo de compromisso são obrigatórios um quando o outro for informado.",
-      );
+    // Único vínculo obrigatório: termo sem responsável. Responsável sem termo é o
+    // caso "anexar o termo depois", em que o PDF sai do botão Gerar termo da linha.
+    if (responsavelRequired && !form.responsavel.trim()) {
+      notify("Todo termo de responsabilidade precisa de um responsável.");
       return;
     }
 
@@ -197,6 +213,9 @@ export function useEquipmentForm({
     setTermFile,
     imageFile,
     setImageFile,
+    attachLater,
+    setAttachLater,
+    responsavelRequired,
     openNew,
     openEdit,
     openDuplicate,

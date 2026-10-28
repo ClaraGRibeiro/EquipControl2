@@ -9,6 +9,7 @@ import {
 import {
   Copy,
   Eye,
+  FilePlus2,
   FileText,
   HardDrive,
   Image as ImageIcon,
@@ -209,75 +210,90 @@ export function EquipmentDetailDialog({
               </div>
             </div>
 
-            {(item.term || item.image) && (
-              <div className="grid gap-4 px-6 pb-6 sm:grid-cols-2">
-                {item.term && (
-                  <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-start gap-2">
-                        <FileText className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold">
-                            Termo de responsabilidade
-                          </p>
-                          <p
-                            className="mt-0.5 break-all text-xs text-muted-foreground"
-                            title={item.term}
-                          >
-                            {fileName(item.term)}
-                          </p>
-                        </div>
+            <div className="grid gap-4 px-6 pb-6 sm:grid-cols-2">
+              {item.term && (
+                <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start gap-2">
+                      <FileText className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold">
+                          Termo de responsabilidade
+                        </p>
+                        <p
+                          className="mt-0.5 break-all text-xs text-muted-foreground"
+                          title={item.term}
+                        >
+                          {fileName(item.term)}
+                        </p>
                       </div>
-                      <a
-                        href={assetUrl(item.term)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="shrink-0 rounded-md border bg-white px-2 py-1 text-xs font-medium hover:bg-muted dark:bg-slate-800"
-                      >
-                        Abrir PDF
-                      </a>
                     </div>
-                    <iframe
-                      src={assetUrl(item.term)}
-                      title={`Prévia do termo de ${item.name}`}
-                      loading="lazy"
-                      className="mt-3 h-72 w-full rounded-lg border bg-white dark:border-slate-700"
-                    />
+                    <a
+                      href={assetUrl(item.term)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="shrink-0 rounded-md border bg-white px-2 py-1 text-xs font-medium hover:bg-muted dark:bg-slate-800"
+                    >
+                      Abrir PDF
+                    </a>
                   </div>
-                )}
-                {item.image && (
-                  <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-start gap-2">
-                        <ImageIcon className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold">
-                            Imagem do equipamento
-                          </p>
-                          <p
-                            className="mt-0.5 break-all text-xs text-muted-foreground"
-                            title={item.image}
-                          >
-                            {fileName(item.image)}
-                          </p>
-                        </div>
+                  <iframe
+                    src={assetUrl(item.term)}
+                    title={`Prévia do termo de ${item.name}`}
+                    loading="lazy"
+                    className="mt-3 h-72 w-full rounded-lg border bg-white dark:border-slate-700"
+                  />
+                </div>
+              )}
+              {item.image && (
+                <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start gap-2">
+                      <ImageIcon className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold">
+                          Imagem do equipamento
+                        </p>
+                        <p
+                          className="mt-0.5 break-all text-xs text-muted-foreground"
+                          title={item.image}
+                        >
+                          {fileName(item.image)}
+                        </p>
                       </div>
-                      <a
-                        href={assetUrl(item.image)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="shrink-0 rounded-md border bg-white px-2 py-1 text-xs font-medium hover:bg-muted dark:bg-slate-800"
-                      >
-                        Abrir imagem
-                      </a>
                     </div>
-                    <div className="mt-3 text-xs text-muted-foreground">
-                      Clique na foto acima para abrir em tamanho real.
+                    <a
+                      href={assetUrl(item.image)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="shrink-0 rounded-md border bg-white px-2 py-1 text-xs font-medium hover:bg-muted dark:bg-slate-800"
+                    >
+                      Abrir imagem
+                    </a>
+                  </div>
+                  <div className="mt-3 text-xs text-muted-foreground">
+                    Clique na foto acima para abrir em tamanho real.
+                  </div>
+                </div>
+              )}
+              {!item.term && (
+                <div className="rounded-xl border border-dashed border-slate-300 p-4 dark:border-slate-700">
+                  <div className="flex items-start gap-2">
+                    <FilePlus2 className="mt-0.5 h-5 w-5 shrink-0 text-teal-700 dark:text-teal-300" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">
+                        Termo ainda não anexado
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {item.responsavel
+                          ? `Responsável atribuído: ${item.responsavel}. Use “Gerar termo” na linha para criar e anexar o PDF.`
+                          : 'Use “Gerar termo” na linha para criar o PDF do termo de responsabilidade.'}
+                      </p>
                     </div>
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
 
             {siblings.length > 0 && (
               <div className="border-t border-slate-200 p-6 dark:border-slate-700">

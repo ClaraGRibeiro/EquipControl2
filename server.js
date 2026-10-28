@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./db');
 const { createAssetStore, isTrashBatchId } = require('./assets');
+const { validateTermResponsavel } = require('./validation');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -78,7 +79,8 @@ app.post('/api/equipments', async (req, res) => {
   let imagePath = '';
   try {
     if (!id || !name || !department) return res.status(400).json({ error: 'Nome e departamento são obrigatórios.' });
-    if (Boolean(String(responsavel).trim()) !== Boolean(term)) return res.status(400).json({ error: 'Responsável e termo de compromisso devem ser informados juntos.' });
+    const termError = validateTermResponsavel({ term, responsavel });
+    if (termError) return res.status(400).json({ error: termError });
     termPath = await assets.saveDataUrl(term, 'terms');
     imagePath = await assets.saveDataUrl(image, 'images');
     await query(
@@ -101,7 +103,7 @@ app.put('/api/equipments/:id', async (req, res) => {
   let newTermPath = '';
   let newImagePath = '';
   try {
-    const rows = await query('SELECT term, image FROM equipments WHERE id = ?', [id]);
+    const rows = await query('SELECT term, image, responsavel FROM equipments WHERE id = ?', [id]);
     if (!rows.length) return res.status(404).json({ error: 'Equipamento não encontrado.' });
     const oldTerm = rows[0].term || '';
     const oldImage = rows[0].image || '';
@@ -109,7 +111,12 @@ app.put('/api/equipments/:id', async (req, res) => {
     const term = body.term === undefined ? oldTerm : body.term;
     const image = body.image === undefined ? oldImage : body.image;
     const responsavel = String(body.responsavel || '').trim();
-    if (Boolean(responsavel) !== Boolean(term)) return res.status(400).json({ error: 'Responsável e termo de compromisso devem ser informados juntos.' });
+    const termError = validateTermResponsavel({
+      term,
+      responsavel,
+      previous: { term: oldTerm, responsavel: rows[0].responsavel },
+    });
+    if (termError) return res.status(400).json({ error: termError });
 
     newTermPath = await assets.saveDataUrl(term, 'terms');
     newImagePath = await assets.saveDataUrl(image, 'images');
