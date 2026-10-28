@@ -72,14 +72,60 @@ export async function buildProjectReportPdf({
   const projectTitle =
     reportProject === "__todos__" ? "Todos os projetos" : reportProject;
 
-  const columns = [
-    { title: "Equipamento", width: 165 },
-    { title: "Patrimônio", width: 82 },
-    { title: "Responsável", width: 105 },
-    { title: "Projeto / fonte", width: 155 },
-    { title: "Valor unit.", width: 78 },
-    { title: "Qtd.", width: 38 },
-    { title: "Status", width: 92 },
+  // Com um projeto escolhido, o cabeçalho já diz qual é: a coluna seria repetição.
+  const showProjectColumn = reportProject === "__todos__";
+
+  // `value` recebe a linha já numerada (1, 2, 3...), então o cabeçalho e as células
+  // saem sempre na mesma ordem, sem vetor paralelo para manter em sincronia.
+  type ReportColumn = {
+    title: string;
+    width: number;
+    value: (item: Equipment, row: number) => string;
+  };
+
+  const columns: ReportColumn[] = [
+    // Numerar as linhas permite perceber se alguém tirou uma página do PDF: a
+    // sequência quebra no meio. Largura generosa o bastante para "100" sem corte.
+    { title: "#", width: 40, value: (_item, row) => String(row) },
+    {
+      title: "Equipamento",
+      width: 165,
+      value: (item) => item.name || "Sem descrição",
+    },
+    {
+      title: "Patrimônio",
+      width: 82,
+      value: (item) => String(item.patrimonio || "").trim() || "—",
+    },
+    {
+      title: "Responsável",
+      width: 105,
+      value: (item) => item.responsavel || "Não atribuído",
+    },
+    ...(showProjectColumn
+      ? [
+          {
+            title: "Projeto / fonte",
+            width: 155,
+            value: (item: Equipment) => (item.project || "").trim() || "Sem projeto",
+          },
+        ]
+      : []),
+    {
+      title: "Valor unit.",
+      width: 78,
+      value: (item) => money(Number(item.value) || 0),
+    },
+    {
+      title: "Qtd.",
+      width: 38,
+      value: (item) => String(Math.max(1, Number(item.quantity) || 1)),
+    },
+    {
+      title: "Status",
+      width: 92,
+      value: (item) => item.status || "—",
+    },
   ];
 
   const originalWidth = columns.reduce(
@@ -111,7 +157,9 @@ export async function buildProjectReportPdf({
   let pagePdf = pdf.addPage([pageWidth, pageHeight]);
   let y = 0;
   let rowNumber = 0;
-  let pageNumber = 0;
+  // Contagem corrida de linhas do relatório (a coluna #): não zera na virada de
+  // página, é o que permite notar uma página arrancada do PDF.
+  let rowSequence = 0;
 
   const drawCellText = (
     value: string,
@@ -145,16 +193,6 @@ export async function buildProjectReportPdf({
     });
   };
 
-  const drawFooter = () => {
-    pagePdf.drawText(`Página ${pageNumber}`, {
-      x: pageWidth - margin - 45,
-      y: 18,
-      size: 8,
-      font,
-      color: colors.muted,
-    });
-  };
-
   // Logo centralizado atrás de tudo: por isso é desenhado antes do cabeçalho e
   // das linhas da tabela.
   const drawWatermark = () => {
@@ -180,8 +218,6 @@ export async function buildProjectReportPdf({
   // isso o cabeçalho e as linhas voltam para o topo e são desenhados por cima
   // do que já estava na página.
   const drawPageHeader = (firstPage = false) => {
-    pageNumber++;
-
     if (!firstPage) {
       pagePdf = pdf.addPage([pageWidth, pageHeight]);
     }
@@ -272,10 +308,11 @@ export async function buildProjectReportPdf({
 
   for (const item of sortedItems) {
     if (y - rowHeight < bottomLimit) {
-      drawFooter();
       drawPageHeader();
       rowNumber = 0;
     }
+
+    rowSequence++;
 
     const quantity = Math.max(1, Number(item.quantity) || 1);
     const unitValue = Number(item.value) || 0;
@@ -300,16 +337,7 @@ export async function buildProjectReportPdf({
       color: colors.border,
     });
 
-    const values = [
-      item.name || "Sem descrição",
-      String(item.patrimonio || "").trim() || "—",
-      item.responsavel || "Não atribuído",
-      (item.project || "").trim() || "Sem projeto",
-      money(unitValue),
-      String(quantity),
-      item.status || "—",
-    ];
-
+    const values = columns.map((column) => column.value(item, rowSequence));
     let x = margin;
 
     values.forEach((value, index) => {
@@ -326,7 +354,6 @@ export async function buildProjectReportPdf({
 
   // Mantém o resumo na mesma página, quando houver espaço.
   if (y - 55 < bottomLimit) {
-    drawFooter();
     drawPageHeader();
   }
 
@@ -363,7 +390,21 @@ export async function buildProjectReportPdf({
     color: colors.primary,
   });
 
-  drawFooter();
+  // Rodapé carimbado no fim, quando o total de páginas já é conhecido:
+  // "Página X de Y" junto da coluna # deixa visível se alguém tirar uma página
+  // do PDF (a numeração de páginas e a de linhas deixam de fechar).
+  const pages = pdf.getPages();
+  pages.forEach((pdfPage, index) => {
+    const label = `Página ${index + 1} de ${pages.length}`;
+
+    pdfPage.drawText(label, {
+      x: pageWidth - margin - font.widthOfTextAtSize(label, 8),
+      y: 18,
+      size: 8,
+      font,
+      color: colors.muted,
+    });
+  });
 
   return pdf.save();
 }

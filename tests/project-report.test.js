@@ -258,3 +258,57 @@ test("nome do arquivo do relatório", async () => {
     /^inventario-Observatorio-Do-Transportes-\d{4}-\d{2}-\d{2}\.pdf$/,
   );
 });
+
+test("coluna Projeto / fonte só existe no relatório de todos os projetos", async () => {
+  const { buildProjectReportPdf } = loadReportModule();
+
+  const selectedItems = Array.from({ length: 5 }, (_, i) => equipment(i));
+
+  const todos = await pagesOf(
+    await buildProjectReportPdf({ selectedItems, reportProject: "__todos__" }),
+  );
+  const umProjeto = await pagesOf(
+    await buildProjectReportPdf({ selectedItems, reportProject: "Projeto Alpha" }),
+  );
+
+  assert.strictEqual(count(todos[0], "Projeto / fonte"), 1);
+  assert.strictEqual(count(todos[0], "Projeto Alpha"), 5);
+
+  // O cabeçalho continua informando o projeto escolhido, mas a coluna sai do PDF.
+  assert.strictEqual(count(umProjeto[0], "Projeto / fonte"), 0);
+  assert.strictEqual(count(umProjeto[0], "Projeto Alpha"), 1);
+});
+
+test("coluna # numera as linhas sem reiniciar na virada de página", async () => {
+  const { buildProjectReportPdf } = loadReportModule();
+
+  const total = 40;
+  const pages = await pagesOf(
+    await buildProjectReportPdf({
+      selectedItems: Array.from({ length: total }, (_, i) => ({
+        ...equipment(i),
+        // quantidades altas para nenhum valor da coluna Qtd. confundir com a numeração
+        quantity: 900 + i,
+      })),
+      reportProject: "__todos__",
+    }),
+  );
+
+  assert.ok(pages.length >= 2, "o relatório precisa passar de uma página");
+
+  const numeracao = pages
+    .flatMap((page) => page.split("\n"))
+    .filter((line) => /^\d+$/.test(line))
+    .map(Number)
+    .filter((value) => value <= total);
+
+  assert.deepStrictEqual(
+    numeracao,
+    Array.from({ length: total }, (_, i) => i + 1),
+  );
+
+  // Rodapé carimbado com o total: "Página 1 de N" em todas as páginas.
+  pages.forEach((_, index) => {
+    assert.strictEqual(count(pages[index], `Página ${index + 1} de ${pages.length}`), 1);
+  });
+});
