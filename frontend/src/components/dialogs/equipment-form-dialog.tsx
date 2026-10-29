@@ -377,11 +377,6 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
                   className="h-9 w-full max-w-[240px]"
                 />
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                O registro passa a apontar para o arquivo que já está em{" "}
-                <code>uploads/images</code>: nada é enviado de novo, e enquanto
-                outro equipamento usar o mesmo arquivo ele não é apagado.
-              </p>
               {gallery.length === 0 ? (
                 <p className="mt-2 text-sm text-muted-foreground">
                   {catalog.length
