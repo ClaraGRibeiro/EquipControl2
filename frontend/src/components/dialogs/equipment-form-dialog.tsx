@@ -341,11 +341,11 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
                         >
                           <img
                             src={assetUrl(image.path)}
-                            alt={image.owners[0] || image.filename}
+                            alt={image.label}
                             className="h-16 w-full rounded border object-cover"
                           />
                           <span className="mt-1 block truncate text-xs font-medium">
-                            {image.owners[0] || image.filename}
+                            {image.label}
                           </span>
                           <span className="block text-[11px] text-muted-foreground">
                             {active
