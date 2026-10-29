@@ -4,9 +4,12 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, LoaderCircle } from "lucide-react";
+import { useMemo, useState } from "react";
 import { departments, statuses } from "@/lib/constants";
+import { existingImages, filterImages } from "@/lib/image-library";
 import { shortFileName } from "@/lib/format";
 import { assetUrl } from "@/lib/files";
+import { cn } from "@/lib/utils";
 import type { InventoryController } from "@/hooks/use-inventory";
 
 export function EquipmentFormDialog({ store }: { store: InventoryController }) {
@@ -27,9 +30,37 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
     saveEquipment,
   } = store;
 
+  // Catálogo de imagens que já estão em uploads/images: reaproveitar evita enviar
+  // o mesmo arquivo de novo e faz vários registros apontarem para uma única cópia.
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryQuery, setLibraryQuery] = useState("");
+  const catalog = useMemo(() => existingImages(items), [items]);
+  const gallery = useMemo(() => filterImages(catalog, libraryQuery), [catalog, libraryQuery]);
+
+  // Só muda o caminho gravado: o arquivo não sobe outra vez e continua compartilhado.
+  const useExistingImage = (path: string) => {
+    setImageFile(null);
+    setField("image", path);
+  };
+
+  const sameFile = (path: string) => {
+    const current = String(form.image || "").trim();
+    if (!current) return false;
+    return current === path || current.replace(/^\/?uploads\/images\//, "") === path.replace(/^\/?uploads\/images\//, "");
+  };
+
   return (
 
-    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+    <Dialog
+      open={dialogOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          setLibraryOpen(false);
+          setLibraryQuery("");
+        }
+        setDialogOpen(open);
+      }}
+    >
       <DialogContent>
         <div>
           <DialogTitle className="text-xl font-bold">
@@ -259,6 +290,76 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
               )}
             </div>
           )}
+          <div className="rounded-lg border bg-slate-50 p-3 dark:bg-slate-800/60">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setLibraryOpen((open) => !open)}
+              >
+                {libraryOpen
+                  ? "Fechar imagens cadastradas"
+                  : "Usar imagem já cadastrada"}
+              </Button>
+              {libraryOpen && (
+                <Input
+                  value={libraryQuery}
+                  onChange={(e) => setLibraryQuery(e.target.value)}
+                  placeholder="Filtrar por equipamento..."
+                  className="h-9 w-full max-w-[240px]"
+                />
+              )}
+            </div>
+            {libraryOpen && (
+              <>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  O registro passa a apontar para o arquivo que já está em{" "}
+                  <code>uploads/images</code>: nada é enviado de novo, e enquanto
+                  outro equipamento usar o mesmo arquivo ele não é apagado.
+                </p>
+                {gallery.length === 0 ? (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {catalog.length
+                      ? "Nenhuma imagem corresponde ao filtro."
+                      : "Nenhum equipamento tem imagem cadastrada ainda."}
+                  </p>
+                ) : (
+                  <div className="mt-3 grid max-h-56 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-4">
+                    {gallery.map((image) => {
+                      const active = sameFile(image.path);
+                      return (
+                        <button
+                          key={image.path}
+                          type="button"
+                          title={`${image.owners.join(", ")} — ${image.count} registro(s)`}
+                          onClick={() => useExistingImage(image.path)}
+                          className={cn(
+                            "rounded-md border bg-white p-2 text-left transition-colors hover:border-primary dark:bg-slate-900",
+                            active && "border-primary ring-2 ring-ring",
+                          )}
+                        >
+                          <img
+                            src={assetUrl(image.path)}
+                            alt={image.owners[0] || image.filename}
+                            className="h-16 w-full rounded border object-cover"
+                          />
+                          <span className="mt-1 block truncate text-xs font-medium">
+                            {image.owners[0] || image.filename}
+                          </span>
+                          <span className="block text-[11px] text-muted-foreground">
+                            {active
+                              ? "em uso neste registro"
+                              : `${image.count} registro(s)`}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
           {termFile && (
             <p className="text-xs text-muted-foreground" title={termFile.name}>
               PDF selecionado: {shortFileName(termFile.name)}

@@ -156,6 +156,8 @@ Vários registros podem apontar para o mesmo arquivo (no `seed.txt` uma mesma im
 
 A contagem é feita com o banco ainda intacto, antes do `UPDATE`/`DELETE`: consultada depois, ela faria o arquivo compartilhado parecer órfão.
 
+Para criar esse compartilhamento de propósito, o formulário tem o botão **Usar imagem já cadastrada** no bloco da imagem: ele abre uma galeria com as imagens que já estão em `uploads/images` (uma entrada por arquivo, com quantos registros a usam e o nome dos equipamentos, filtrável por nome e sem acento) e escolher uma delas apenas grava no registro o mesmo caminho que o outro já usa — nenhum arquivo é enviado de novo. O catálogo vem de `existingImages` e `filterImages` em `frontend/src/lib/image-library.ts`, montado a partir da lista que já está em memória; imagem em Data URL (coluna com base64) fica fora da lista. O PDF do termo ainda não tem seletor equivalente.
+
 ## Funcionalidades
 
 - Listagem com busca por nome, patrimônio, responsável e projeto
@@ -166,6 +168,7 @@ A contagem é feita com o banco ainda intacto, antes do `UPDATE`/`DELETE`: consu
 - A tabela não tem coluna **Documentos**: as colunas são Equipamento, Departamento, Responsável, Valor unitário, Qtd., Status e Ações. O PDF do termo e a imagem abrem pelo **Detalhe do registro** ou pela prévia do formulário de edição, e **Gerar termo** é um dos ícones da coluna Ações
 - **Responsável na tabela** aparece resumido, só com o primeiro e o último nome (`Narciso Ferreira Dos Santos Neto` → `Narciso Neto`, helper `shortName` em `frontend/src/lib/format.ts`): o nome completo fica no `title` da célula (hover), no formulário e no detalhe do registro, e a busca continua casando pelo nome inteiro
 - Remover o PDF ou a imagem no formulário desvincula o arquivo do registro na hora, com **desfazer por 3 segundos** que devolve o arquivo e o caminho gravado. Se outro registro aponta para o mesmo arquivo, ele **continua em** `uploads/` (a resposta da API traz o contador `kept` e a mensagem avisa)
+- **Reaproveitar imagem** (`Usar imagem já cadastrada` no formulário): vários equipamentos passam a apontar para o mesmo arquivo de `uploads/images` sem enviar o arquivo de novo; útil quando 8 câmeras são iguais e só uma é diferente
 - Cadastro duplicado: se todos os atributos coincidirem com um registro existente, a quantidade é aumentada em 1 em vez de criar um novo registro
 - Quantidade é ajustada pelo formulário de cadastro/edição; na tabela a coluna Qtd. apenas exibe o número (sem botões +/−)
 - Alteração de status individual ou em lote
@@ -217,13 +220,13 @@ O login (`admin` / `otmg123`) é validado **no navegador** e guardado em `localS
         ├── App.tsx        # Composição da tela: login, cabeçalho, tabelas e diálogos
         ├── components/    # inventory/, dialogs/, ui/, login e rodapé
         ├── hooks/         # use-inventory (composer) + crud, detalhe, termo, exportações, view
-        └── lib/           # api, filtros, ids, Excel, termo e relatório PDF
+        └── lib/           # api, filtros, ids, imagens reaproveitáveis, Excel, termo e relatório PDF
 ```
 
 ## Limitações conhecidas
 
 - Autenticação apenas no navegador; a API fica aberta (ver aviso acima)
-- Sem lint e sem CI; os testes cobrem `assets.js` (salvar/lixeira/restaurar/purge e o arquivo compartilhado que não sai de `uploads/`), `validation.js` (responsável × termo, inclusive o legado), geração de id, formatação de texto (nome de arquivo e data), tema, ordem das rotas do `server.js` e o gerador do relatório PDF
+- Sem lint e sem CI; os testes cobrem `assets.js` (salvar/lixeira/restaurar/purge e o arquivo compartilhado que não sai de `uploads/`), `validation.js` (responsável × termo, inclusive o legado), geração de id, formatação de texto (nome de arquivo e data), catálogo de imagens reaproveitáveis (`image-library.ts`), tema, ordem das rotas do `server.js` e o gerador do relatório PDF
 - `components/inventory/inventory-table.tsx` ainda reúne linha de agrupamento, linhas filhas, seleção e ações da linha
 - Atualização de status em lote dispara uma requisição `PUT` por registro; não há endpoint de lote
 - A listagem não é paginada no servidor (`SELECT *`); toda filtragem é feita no navegador
