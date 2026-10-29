@@ -406,11 +406,6 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
                         <span className="mt-1 block truncate text-xs font-medium">
                           {image.label}
                         </span>
-                        <span className="block text-[11px] text-muted-foreground">
-                          {active
-                            ? "em uso neste registro"
-                            : `${image.count} registro(s)`}
-                        </span>
                       </button>
                     );
                   })}
