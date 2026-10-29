@@ -168,13 +168,7 @@ export function InventoryTable({ store }: { store: InventoryController }) {
                               {entry.name}
                             </p>
                             <p className="mt-0.5 text-xs text-teal-800 dark:text-teal-300">
-                              {entry.items.length} registros agrupados ·{" "}
-                              {entry.items.reduce(
-                                (sum, i) =>
-                                  sum + Math.max(0, Number(i.quantity) || 0),
-                                0,
-                              )}{" "}
-                              unidades
+                              {entry.items.length} registros agrupados
                             </p>
                           </div>
                         </div>

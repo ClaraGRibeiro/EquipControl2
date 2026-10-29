@@ -86,11 +86,6 @@ export function ProjectReportDialog({ store }: { store: InventoryController }) {
             registro(s) serão incluídos no PDF.
           </p>
 
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            As linhas vêm numeradas de 1 em diante, sem reiniciar a cada página, e
-            o rodapé traz "Página X de Y". A coluna Projeto / fonte só aparece em
-            "Todos os projetos".
-          </p>
         </div>
 
         <div className="flex justify-end gap-2 border-t pt-4">
