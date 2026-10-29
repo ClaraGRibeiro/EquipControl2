@@ -3,7 +3,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const db = require('./db');
-const { createAssetStore, isTrashBatchId } = require('./assets');
+const { createAssetStore, isTrashBatchId, sharedAssetKeys } = require('./assets');
 const { validateTermResponsavel } = require('./validation');
 
 const app = express();
@@ -41,6 +41,17 @@ function query(sql, params = []) {
   return new Promise((resolve, reject) => {
     db.query(sql, params, (err, result) => err ? reject(err) : resolve(result));
   });
+}
+
+/**
+ * Chaves dos arquivos que ainda são apontados por outro registro.
+ * O banco é lido antes de qualquer mudança e `ignoreIds` ficam de fora, porque são
+ * justamente os registros que estão sendo apagados ou alterados: um arquivo que só
+ * eles usavam pode ir para a lixeira, um arquivo compartilhado continua em uploads/.
+ */
+async function assetsInUse(ignoreIds) {
+  const rows = await query('SELECT id, term, image FROM equipments');
+  return sharedAssetKeys(rows, ignoreIds);
 }
 
 async function migrateLegacyAssets(item) {
@@ -107,6 +118,8 @@ app.put('/api/equipments/:id', async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Equipamento não encontrado.' });
     const oldTerm = rows[0].term || '';
     const oldImage = rows[0].image || '';
+    // Lido antes do UPDATE: arquivo que outro registro também usa não sai de uploads/.
+    const keep = await assetsInUse([id]);
     const body = req.body;
     const term = body.term === undefined ? oldTerm : body.term;
     const image = body.image === undefined ? oldImage : body.image;
@@ -128,20 +141,25 @@ app.put('/api/equipments/:id', async (req, res) => {
     // O termo/imagem que deixaram de ser usados sai de uploads/ e espera na lixeira
     // para o "Desfazer" do formulário funcionar; a lixeira nunca derruba a edição.
     let trashId = '';
+    let trashed = 0;
+    let kept = 0;
     try {
       trashId = assets.newTrashBatch();
       const moved = await assets.trashReplacedAssets(
         { id, before: { term: oldTerm, image: oldImage }, after: { term: newTermPath, image: newImagePath } },
         trashId,
+        { keep },
       );
       trashId = moved.trashId;
+      trashed = moved.trashed;
+      kept = moved.kept;
     } catch (trashErr) {
       console.error('Falha ao mover arquivos substituídos para a lixeira:', trashErr);
       trashId = '';
-      if (oldTerm && oldTerm !== newTermPath) void assets.removeFile(oldTerm, 'terms');
-      if (oldImage && oldImage !== newImagePath) void assets.removeFile(oldImage, 'images');
+      if (oldTerm && oldTerm !== newTermPath) void assets.removeFile(oldTerm, 'terms', { keep });
+      if (oldImage && oldImage !== newImagePath) void assets.removeFile(oldImage, 'images', { keep });
     }
-    res.json({ message: 'Equipamento atualizado com sucesso!', trashId });
+    res.json({ message: 'Equipamento atualizado com sucesso!', trashId, trashed, kept });
   } catch (err) {
     if (newTermPath && newTermPath !== req.body.term) void assets.removeFile(newTermPath, 'terms');
     if (newImagePath && newImagePath !== req.body.image) void assets.removeFile(newImagePath, 'images');
@@ -232,18 +250,21 @@ app.delete('/api/equipments', async (req, res) => {
   if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'Nenhum ID fornecido.' });
   try {
     const rows = await query('SELECT * FROM equipments WHERE id IN (?)', [ids]);
+    // Lido antes do DELETE: arquivo que outro registro continua usando fica em uploads/.
+    const keep = await assetsInUse(ids);
     await query('DELETE FROM equipments WHERE id IN (?)', [ids]);
     // O desfazer dura 3 segundos no front; a lixeira segura os arquivos até o purge.
     const trashId = assets.newTrashBatch();
     let trashed = 0;
     let missing = 0;
+    let kept = 0;
     try {
-      ({ trashed, missing } = await assets.trashAssets(rows, trashId));
+      ({ trashed, missing, kept } = await assets.trashAssets(rows, trashId, { keep }));
     } catch (trashErr) {
       // A linha já saiu do banco: preservar o payload do desfazer vale mais que a lixeira.
       console.error('Falha ao mover arquivos para a lixeira:', trashErr);
     }
-    res.json({ message: 'Equipamento(s) removido(s) com sucesso!', items: rows, trashId, trashed, missing });
+    res.json({ message: 'Equipamento(s) removido(s) com sucesso!', items: rows, trashId, trashed, missing, kept });
   } catch (err) {
     console.error('Erro ao excluir equipamento(s):', err);
     res.status(500).json({ error: err.message || 'Erro ao excluir equipamento(s).' });

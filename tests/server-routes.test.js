@@ -28,3 +28,12 @@ test('uploads são publicados antes do front-end compilado', () => {
 test('o modelo do termo é lido do arquivo da raiz, não do build', () => {
   assert.ok(/sendFile\(path\.join\(__dirname, 'template\.pdf'\)/.test(source), 'a rota deve apontar para template.pdf na raiz');
 });
+
+test('edição e exclusão descobrem quem mais usa o arquivo antes de mexer nele', () => {
+  // A contagem de usuários precisa ser feita com o banco ainda intacto: depois do
+  // UPDATE/DELETE o arquivo compartilhado parece órfão e sai de uploads/.
+  assert.ok(at('const keep = await assetsInUse([id]);') < at('UPDATE equipments SET name=?'), 'a edição consulta antes do UPDATE');
+  assert.ok(at('const keep = await assetsInUse(ids);') < at('DELETE FROM equipments'), 'a exclusão consulta antes do DELETE');
+  assert.ok(/trashReplacedAssets\([\s\S]{0,400}?\{ keep \}/.test(source), 'a edição repassa a lista de arquivos a preservar');
+  assert.ok(source.includes('trashAssets(rows, trashId, { keep })'), 'a exclusão repassa a lista de arquivos a preservar');
+});

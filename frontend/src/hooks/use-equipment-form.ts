@@ -119,8 +119,9 @@ export function useEquipmentForm({
       // Edição: atualiza somente o registro selecionado.
       if (editing) {
         // O PUT devolve o lote de arquivos que foram para uploads/.trash: é por ele
-        // que o desfazer vai buscar o termo/imagem de volta.
-        const saved = await api<{ trashId?: string }>(
+        // que o desfazer vai buscar o termo/imagem de volta. "kept" é o arquivo que
+        // ficou em uploads/ porque outro equipamento também aponta para ele.
+        const saved = await api<{ trashId?: string; trashed?: number; kept?: number }>(
           `/api/equipments/${encodeURIComponent(editing.id)}`,
           { method: "PUT", body: JSON.stringify(payload) },
         );
@@ -139,7 +140,15 @@ export function useEquipmentForm({
 
         if (removedAssets.length) {
           setUndoAssets(removedAssets);
-          notify("Arquivo removido. Você pode desfazer em até 3 segundos.");
+          // "kept" é o arquivo que ficou em uploads/ porque outro equipamento também o usa.
+          const sharedNote = saved.kept
+            ? " O arquivo continua salvo porque outro equipamento usa o mesmo arquivo."
+            : "";
+          notify(
+            saved.trashed
+              ? `Arquivo removido.${sharedNote} Você pode desfazer em até 3 segundos.`
+              : `Arquivo desvinculado do registro.${sharedNote} Você pode desfazer em até 3 segundos.`,
+          );
         } else {
           notify("Equipamento atualizado.");
         }

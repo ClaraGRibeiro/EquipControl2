@@ -15,6 +15,46 @@ function exists(target) {
   return fs.promises.access(target).then(() => true, () => false);
 }
 
+/**
+ * O valor das colunas term/image aponta para um arquivo de uploads/?
+ * Aceita o formato atual (/uploads/terms/x.pdf) e o do seed (uploads/terms/x.pdf).
+ */
+function isStoredPath(value, kind) {
+  const value2 = String(value).trim();
+  const prefix = `uploads/${kind}/`;
+  return value2.startsWith(prefix) || value2.startsWith(`/${prefix}`);
+}
+
+/**
+ * Nome do arquivo dentro de uploads/<kind>/ e a chave usada para contar usuários
+ * do arquivo ("<kind>/<nome>"). Data URL e valor vazio devolvem ''.
+ */
+function assetKey(value, kind) {
+  if (typeof value !== 'string' || !isStoredPath(value, kind)) return '';
+  const filename = path.basename(String(value).trim());
+  if (!filename || filename === '.' || filename === '..') return '';
+  return `${kind}/${filename}`;
+}
+
+/**
+ * Arquivos que continuam em uso: chave de cada arquivo apontado por alguma linha.
+ * `ignoreIds` são os registros que estão sendo apagados ou alterados, então não
+ * contam como "outro usuário" do arquivo. Um arquivo compartilhado por dois registros
+ * excluídos na mesma operação não entra aqui e vai para a lixeira normalmente.
+ */
+function sharedAssetKeys(rows, ignoreIds = []) {
+  const skip = new Set((ignoreIds || []).map((id) => String(id)));
+  const keys = new Set();
+  for (const row of rows || []) {
+    if (!row || skip.has(String(row.id))) continue;
+    for (const { kind, field } of ASSET_FIELDS) {
+      const key = assetKey(row[field], kind);
+      if (key) keys.add(key);
+    }
+  }
+  return keys;
+}
+
 /** O identificador da lixeira é sempre um UUID; qualquer outro valor é rejeitado. */
 function isTrashBatchId(value) {
   return typeof value === 'string' && UUID_PATTERN.test(value);
@@ -48,12 +88,6 @@ function createAssetStore({ uploadsRoot, trashTtlMs = 15 * 60 * 1000 }) {
     const filename = path.basename(assetPath.trim());
     if (!filename || filename === '.' || filename === '..') return null;
     return path.join(kindDir(kind), filename);
-  }
-
-  function isStoredPath(data, kind) {
-    const value = String(data).trim();
-    const prefix = `uploads/${kind}/`;
-    return value.startsWith(prefix) || value.startsWith(`/${prefix}`);
   }
 
   /** Salva o Data URL recebido e devolve o caminho público. Caminhos já gravados são mantidos. */
@@ -100,7 +134,8 @@ function createAssetStore({ uploadsRoot, trashTtlMs = 15 * 60 * 1000 }) {
   }
 
   /** Apaga o arquivo em definitivo. Usado quando o arquivo antigo foi substituído. */
-  async function removeFile(assetPath, kind) {
+  async function removeFile(assetPath, kind, { keep = null } = {}) {
+    if (keep && keep.has(assetKey(assetPath, kind))) return false;
     const file = localPath(assetPath, kind);
     if (!file) return false;
     return fs.promises.rm(file, { force: true }).then(() => true, () => false);
@@ -119,16 +154,25 @@ function createAssetStore({ uploadsRoot, trashTtlMs = 15 * 60 * 1000 }) {
 
   /**
    * Move os termos e imagens dos registros excluídos para a lixeira.
-   * Retorna quantos arquivos foram movidos e quantos caminhos não tinham arquivo.
+   * `keep` são as chaves ("<kind>/<nome>") que outros registros ainda usam: esses
+   * arquivos ficam onde estão e são contados em "kept".
+   * Retorna quantos arquivos foram movidos, quantos não tinham arquivo e quantos
+   * foram preservados por ainda estarem em uso.
    */
-  async function trashAssets(items, trashId) {
+  async function trashAssets(items, trashId, { keep = null } = {}) {
     const target = trashDirFor(trashId);
     let trashed = 0;
     let missing = 0;
+    let kept = 0;
     for (const item of items) {
       for (const { kind, field } of ASSET_FIELDS) {
         const value = item[field] || '';
         if (!value) continue;
+        const key = assetKey(value, kind);
+        if (keep && key && keep.has(key)) {
+          kept += 1;
+          continue;
+        }
         const source = localPath(value, kind);
         if (!source || !(await exists(source))) {
           missing += 1;
@@ -140,30 +184,36 @@ function createAssetStore({ uploadsRoot, trashTtlMs = 15 * 60 * 1000 }) {
         trashed += 1;
       }
     }
-    return { trashed, missing };
+    return { trashed, missing, kept };
   }
 
   /**
    * Move para a lixeira o termo/imagem que deixaram de ser usados numa edição.
    * A comparação é pelo arquivo (nome dentro da pasta do tipo), não pela string:
    * o mesmo anexo pode chegar com ou sem barra inicial e não deve sair de uploads/.
-   * Sem mudança de arquivo, devolve trashId vazio para o front não mostrar desfazer.
+   * `keep` preserva os arquivos que ainda são apontados por outro registro.
+   * Sem arquivo para mover, devolve trashId vazio para o front não mostrar desfazer.
    */
-  async function trashReplacedAssets({ id, before, after }, trashId) {
+  async function trashReplacedAssets({ id, before, after }, trashId, { keep = null } = {}) {
     const nameOf = (value, kind) => {
       const file = localPath(value, kind);
       return file ? path.basename(file) : '';
     };
     const picked = { id };
+    let kept = 0;
     for (const { kind, field } of ASSET_FIELDS) {
       const oldName = nameOf(before[field] || '', kind);
       if (!oldName) continue;
       if (nameOf(after[field] || '', kind) === oldName) continue;
+      if (keep && keep.has(`${kind}/${oldName}`)) {
+        kept += 1;
+        continue;
+      }
       picked[field] = before[field];
     }
-    if (!picked.term && !picked.image) return { trashId: '', trashed: 0, missing: 0 };
-    const { trashed, missing } = await trashAssets([picked], trashId);
-    return { trashId, trashed, missing };
+    if (!picked.term && !picked.image) return { trashId: '', trashed: 0, missing: 0, kept };
+    const moved = await trashAssets([picked], trashId, { keep });
+    return { trashId, ...moved, kept: moved.kept + kept };
   }
 
   /**
@@ -246,4 +296,12 @@ function createAssetStore({ uploadsRoot, trashTtlMs = 15 * 60 * 1000 }) {
   };
 }
 
-module.exports = { createAssetStore, isTrashBatchId, KINDS, PUBLIC_PREFIX };
+module.exports = {
+  createAssetStore,
+  isTrashBatchId,
+  isStoredPath,
+  assetKey,
+  sharedAssetKeys,
+  KINDS,
+  PUBLIC_PREFIX,
+};

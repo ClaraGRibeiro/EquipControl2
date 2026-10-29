@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { test, beforeEach, afterEach } = require('node:test');
 
-const { createAssetStore, isTrashBatchId } = require('../assets');
+const { createAssetStore, isTrashBatchId, sharedAssetKeys, assetKey } = require('../assets');
 
 const PDF_BASE64 = Buffer.from('%PDF-1.4 equipcontrol termo de teste').toString('base64');
 const IMAGE_BASE64 = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).toString('base64');
@@ -55,11 +55,91 @@ test('apagar registro move termo e imagem para a lixeira e esvazia uploads', asy
 
   const result = await store.trashAssets([{ id: 'equip-1', term, image }], trashId);
 
-  assert.deepEqual(result, { trashed: 2, missing: 0 });
+  assert.deepEqual(result, { trashed: 2, missing: 0, kept: 0 });
   assert.equal(fs.existsSync(store.localPath(term, 'terms')), false);
   assert.equal(fs.existsSync(store.localPath(image, 'images')), false);
   assert.equal(fs.existsSync(path.join(store.trashRoot, trashId, 'terms', 'equip-1.pdf')), true);
   assert.equal(fs.existsSync(path.join(store.trashRoot, trashId, 'images', 'equip-1.jpg')), true);
+});
+
+test('imagem usada por outro registro continua em uploads quando um é apagado', async () => {
+  const shared = writeActive('images', 'images (1).jpg');
+  const trashId = store.newTrashBatch();
+  const allRows = [{ id: 'a', image: shared }, { id: 'b', image: shared.replace(/^\//, '') }];
+
+  // O banco ainda tem as duas linhas: 'a' está sendo apagada, 'b' continua usando.
+  const keep = sharedAssetKeys(allRows, ['a']);
+  const result = await store.trashAssets([allRows[0]], trashId, { keep });
+
+  assert.deepEqual(result, { trashed: 0, missing: 0, kept: 1 });
+  assert.equal(fs.existsSync(store.localPath(shared, 'images')), true, 'o arquivo fica onde está');
+  assert.equal(fs.existsSync(path.join(store.trashRoot, trashId)), false, 'nem lote de lixeira é criado');
+});
+
+test('apagar o último registro que usava o arquivo manda ele para a lixeira', async () => {
+  const shared = writeActive('images', 'images (2).jpg');
+  const rows = [{ id: 'a', image: shared }, { id: 'b', image: shared }];
+
+  // 'a' sai primeiro e 'b' ainda aponta para o mesmo arquivo: nada se move.
+  const first = await store.trashAssets([rows[0]], store.newTrashBatch(), {
+    keep: sharedAssetKeys(rows, ['a']),
+  });
+  assert.deepEqual(first, { trashed: 0, missing: 0, kept: 1 });
+  assert.equal(fs.existsSync(store.localPath(shared, 'images')), true);
+
+  // Agora 'b' também saiu: sem nenhum outro usuário, o arquivo vai para a lixeira.
+  const secondBatch = store.newTrashBatch();
+  const second = await store.trashAssets([rows[1]], secondBatch, {
+    keep: sharedAssetKeys(rows, ['a', 'b']),
+  });
+  assert.deepEqual(second, { trashed: 1, missing: 0, kept: 0 });
+  assert.equal(fs.existsSync(store.localPath(shared, 'images')), false);
+  assert.equal(fs.existsSync(path.join(store.trashRoot, secondBatch, 'images', 'images (2).jpg')), true);
+});
+
+test('editar um registro tirando a imagem compartilhada não move o arquivo', async () => {
+  const shared = writeActive('images', 'images (3).jpg');
+  const keep = sharedAssetKeys([{ id: 'a', image: shared }, { id: 'b', image: shared }], ['a']);
+
+  const result = await store.trashReplacedAssets(
+    { id: 'a', before: { image: shared }, after: { image: '' } },
+    store.newTrashBatch(),
+    { keep },
+  );
+
+  assert.deepEqual(result, { trashId: '', trashed: 0, missing: 0, kept: 1 });
+  assert.equal(fs.existsSync(store.localPath(shared, 'images')), true);
+  assert.equal(fs.readdirSync(store.trashRoot).length, 0, 'nenhum lote de lixeira é criado');
+});
+
+test('removeFile preserva o arquivo que outro registro ainda usa', async () => {
+  const shared = writeActive('images', 'images (4).jpg');
+  const keep = sharedAssetKeys([{ id: 'a', image: shared }, { id: 'b', image: shared }], ['a']);
+
+  assert.equal(await store.removeFile(shared, 'images', { keep }), false);
+  assert.equal(fs.existsSync(store.localPath(shared, 'images')), true);
+  assert.equal(await store.removeFile(shared, 'images'), true);
+  assert.equal(fs.existsSync(store.localPath(shared, 'images')), false);
+});
+
+test('contagem de usuários do arquivo ignora o registro alterado e Data URL', () => {
+  const rows = [
+    { id: 'a', term: '/uploads/terms/x.pdf', image: 'uploads/images/y.jpg' },
+    { id: 'b', term: '', image: '/uploads/images/y.jpg' },
+    { id: 'c', term: 'data:application/pdf;base64,JVBERi0x', image: '' },
+  ];
+
+  // Só conta quem fica: 'a' está sendo alterado, 'c' tem termo em Base64 antigo.
+  assert.deepEqual([...sharedAssetKeys(rows, ['a'])], ['images/y.jpg']);
+  assert.deepEqual([...sharedAssetKeys(rows, ['b'])], ['terms/x.pdf', 'images/y.jpg']);
+  assert.deepEqual([...sharedAssetKeys(rows, ['a', 'b'])], []);
+
+  // O mesmo arquivo gravado com ou sem barra inicial é a mesma chave.
+  assert.equal(assetKey('uploads/images/y.jpg', 'images'), 'images/y.jpg');
+  assert.equal(assetKey('/uploads/images/y.jpg', 'images'), 'images/y.jpg');
+  assert.equal(assetKey('data:image/png;base64,AAA', 'images'), '');
+  // tipo errado não conta: imagem não segura termo e vice-versa.
+  assert.equal(sharedAssetKeys([{ id: 'z', term: '/uploads/images/y.jpg' }], []).size, 0);
 });
 
 test('registros sem anexo ou com caminho sem arquivo não quebram o apagamento', async () => {
@@ -71,7 +151,7 @@ test('registros sem anexo ou com caminho sem arquivo não quebram o apagamento',
     store.newTrashBatch(),
   );
 
-  assert.deepEqual(result, { trashed: 0, missing: 1 });
+  assert.deepEqual(result, { trashed: 0, missing: 1, kept: 0 });
 });
 
 test('desfazer devolve os arquivos da lixeira para uploads', async () => {
@@ -165,7 +245,7 @@ test('edição que remove ou troca anexo tira o arquivo antigo de uploads', asyn
     trashId,
   );
 
-  assert.deepEqual(result, { trashId, trashed: 2, missing: 0 });
+  assert.deepEqual(result, { trashId, trashed: 2, missing: 0, kept: 0 });
   assert.equal(fs.existsSync(store.localPath(oldTerm, 'terms')), false);
   assert.equal(fs.existsSync(store.localPath(oldImage, 'images')), false);
   assert.equal(fs.existsSync(store.localPath(newTerm, 'terms')), true);
@@ -185,7 +265,7 @@ test('edição que não mexe no anexo deixa o arquivo em uploads', async () => {
     store.newTrashBatch(),
   );
 
-  assert.deepEqual(result, { trashId: '', trashed: 0, missing: 0 });
+  assert.deepEqual(result, { trashId: '', trashed: 0, missing: 0, kept: 0 });
   assert.equal(fs.existsSync(store.localPath(term, 'terms')), true);
   assert.equal(fs.existsSync(store.localPath(image, 'images')), true);
   assert.equal(fs.readdirSync(store.trashRoot).length, 0);

@@ -125,11 +125,11 @@ Depois do build, acesse `http://localhost:3000`: o Express entrega os arquivos d
 |---|---|---|
 | `GET` | `/api/equipments` | Retorna todos os registros e migra automaticamente termos/imagens antigos salvos como Base64 para arquivos em disco |
 | `POST` | `/api/equipments` | Cria. Exige `id`, `name`, `department`. Validação de `validation.js`: todo termo exige responsável; **responsável sem termo é aceito** (é o caso "anexar o termo depois") |
-| `PUT` | `/api/equipments/:id` | Atualiza. Campos `term`/`image` ausentes no corpo mantêm o valor atual; o anexo que deixou de ser usado sai de `uploads/` e espera em `uploads/.trash/<trashId>/`, e a resposta devolve o `trashId` (vazio quando nenhum anexo mudou). A regra do responsável só é cobrada quando o **termo muda**: registro legado que já está salvo com PDF e responsável vazio continua editável (inclusive para trocar o status na tabela) |
+| `PUT` | `/api/equipments/:id` | Atualiza. Campos `term`/`image` ausentes no corpo mantêm o valor atual; o anexo que deixou de ser usado sai de `uploads/` e espera em `uploads/.trash/<trashId>/`, e a resposta devolve o `trashId` (vazio quando nenhum anexo mudou), `trashed` e `kept` (arquivos que ficaram em `uploads/` porque outro registro também os aponta). A regra do responsável só é cobrada quando o **termo muda**: registro legado que já está salvo com PDF e responsável vazio continua editável (inclusive para trocar o status na tabela) |
 | `POST` | `/api/equipments/assets/restore` | Devolve para `uploads/` os arquivos que uma edição tirou de lá (desfazer do formulário). Corpo `{ "items": [{ "id", "term", "image" }], "trashId": "..." }`; o que já foi purgado vem em `lost` para o front não regravar link quebrado |
 | `POST` | `/api/equipments/restore` | Reinsere registros excluídos (usado pelo "Desfazer"). Corpo `{ "items": [...], "trashId": "..." }`: se enviado, os arquivos voltam da lixeira; caminhos sem arquivo são limpos antes de reinserir |
 | `POST` | `/api/equipments/trash/purge` | Apaga em definitivo os arquivos do lote informado. Corpo `{ "trashId": "..." }` (ou `trashIds: [...]`). Chamado pela interface quando o desfazer expira |
-| `DELETE` | `/api/equipments` | Corpo `{ "ids": [...] }`. Remove as linhas do banco, move os PDFs/imagens para `uploads/.trash/<trashId>/` e devolve `{ items, trashId, trashed, missing }` |
+| `DELETE` | `/api/equipments` | Corpo `{ "ids": [...] }`. Remove as linhas do banco, move os PDFs/imagens para `uploads/.trash/<trashId>/` (menos os ainda usados por outro registro) e devolve `{ items, trashId, trashed, missing, kept }` |
 | `GET` | `/uploads/terms/*`, `/uploads/images/*` | Arquivos estáticos |
 | `GET` | `/template.pdf` | Modelo usado na geração do termo. Tem rota própria lendo o `template.pdf` da raiz, registrada antes do front-end compilado: sem ela o fallback do SPA devolve `index.html` e o pdf-lib falha com "No PDF header found" |
 
@@ -146,6 +146,16 @@ A edição de um equipamento usa o mesmo depósito: quando o `PUT` grava um PDF/
 
 Os arquivos nunca são servidos pela rota `/uploads/*`: o Express publica apenas `uploads/terms` e `uploads/images`.
 
+### Arquivo usado por mais de um registro
+
+Vários registros podem apontar para o mesmo arquivo (no `seed.txt` uma mesma imagem atende vários equipamentos). Antes de mover qualquer PDF/imagem, o servidor lê o banco e monta a lista dos arquivos que continuam em uso: `assetsInUse` em `server.js` chama `sharedAssetKeys` de `assets.js`, que compara pelo nome do arquivo dentro da pasta do tipo (`"<kind>/<nome>"`, com `assetKey`) ignorando os registros que estão sendo apagados ou alterados. O `trashAssets`, o `trashReplacedAssets` e o `removeFile` recebem essa lista como opção `{ keep }`:
+
+- arquivo com outro usuário continua em `uploads/` e é contado em `kept`; só o campo do registro muda;
+- arquivo que ficou órfão (nenhum outro registro o aponta) vai normalmente para `uploads/.trash/<trashId>/`;
+- dois registros que compartilhavam o arquivo e são excluídos juntos na mesma chamada mandam o arquivo para a lixeira, porque nenhum dos dois conta como "outro usuário";
+
+A contagem é feita com o banco ainda intacto, antes do `UPDATE`/`DELETE`: consultada depois, ela faria o arquivo compartilhado parecer órfão.
+
 ## Funcionalidades
 
 - Listagem com busca por nome, patrimônio, responsável e projeto
@@ -155,7 +165,7 @@ Os arquivos nunca são servidos pela rota `/uploads/*`: o Express publica apenas
 - **Detalhe do registro** (ícone de olho na linha): modal de leitura com nome e projeto por extenso (sem corte de coluna), foto em tamanho grande — clique abre em tamanho real —, prévia do termo embutida no modal, nome dos arquivos salvos em `uploads/`, valor unitário/total, id e data de cadastro, além de atalhos para gerar termo, duplicar, editar e excluir. Registros homônimos aparecem listados e são clicáveis para navegar entre eles
 - A tabela não tem coluna **Documentos**: as colunas são Equipamento, Departamento, Responsável, Valor unitário, Qtd., Status e Ações. O PDF do termo e a imagem abrem pelo **Detalhe do registro** ou pela prévia do formulário de edição, e **Gerar termo** é um dos ícones da coluna Ações
 - **Responsável na tabela** aparece resumido, só com o primeiro e o último nome (`Narciso Ferreira Dos Santos Neto` → `Narciso Neto`, helper `shortName` em `frontend/src/lib/format.ts`): o nome completo fica no `title` da célula (hover), no formulário e no detalhe do registro, e a busca continua casando pelo nome inteiro
-- Remover o PDF ou a imagem no formulário tira o arquivo de `uploads/` na hora, com **desfazer por 3 segundos** que devolve o arquivo e o caminho gravado
+- Remover o PDF ou a imagem no formulário desvincula o arquivo do registro na hora, com **desfazer por 3 segundos** que devolve o arquivo e o caminho gravado. Se outro registro aponta para o mesmo arquivo, ele **continua em** `uploads/` (a resposta da API traz o contador `kept` e a mensagem avisa)
 - Cadastro duplicado: se todos os atributos coincidirem com um registro existente, a quantidade é aumentada em 1 em vez de criar um novo registro
 - Quantidade é ajustada pelo formulário de cadastro/edição; na tabela a coluna Qtd. apenas exibe o número (sem botões +/−)
 - Alteração de status individual ou em lote
@@ -192,7 +202,7 @@ O login (`admin` / `otmg123`) é validado **no navegador** e guardado em `localS
 .
 ├── server.js              # API Express, uploads e estáticos
 ├── validation.js          # Regras de negócio validadas pela API (responsável × termo)
-├── assets.js              # Depósito de arquivos: salvar, lixeira, restaurar, purge
+├── assets.js              # Depósito de arquivos: salvar, lixeira, restaurar, purge, uso por registro
 ├── db.js                  # Conexão MariaDB (mysql2)
 ├── seed.txt               # Dados de exemplo
 ├── template.pdf           # Modelo do termo de responsabilidade
@@ -213,7 +223,7 @@ O login (`admin` / `otmg123`) é validado **no navegador** e guardado em `localS
 ## Limitações conhecidas
 
 - Autenticação apenas no navegador; a API fica aberta (ver aviso acima)
-- Sem lint e sem CI; os testes cobrem `assets.js` (salvar/lixeira/restaurar/purge), `validation.js` (responsável × termo, inclusive o legado), geração de id, formatação de texto (nome de arquivo e data), tema, ordem das rotas do `server.js` e o gerador do relatório PDF
+- Sem lint e sem CI; os testes cobrem `assets.js` (salvar/lixeira/restaurar/purge e o arquivo compartilhado que não sai de `uploads/`), `validation.js` (responsável × termo, inclusive o legado), geração de id, formatação de texto (nome de arquivo e data), tema, ordem das rotas do `server.js` e o gerador do relatório PDF
 - `components/inventory/inventory-table.tsx` ainda reúne linha de agrupamento, linhas filhas, seleção e ações da linha
 - Atualização de status em lote dispara uma requisição `PUT` por registro; não há endpoint de lote
 - A listagem não é paginada no servidor (`SELECT *`); toda filtragem é feita no navegador
