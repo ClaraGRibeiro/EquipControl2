@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS equipments (
 );
 ```
 
-Para popular com a base de exemplo, execute `seed.txt` (13 equipamentos). Ele referencia arquivos já versionados em `uploads/`; confirme que eles existem antes de importar.
+Para popular com a base de exemplo, execute `seed.txt` (uma linha de `VALUES` por equipamento: são 24 no arquivo versionado). Ele referencia arquivos já versionados em `uploads/`; confirme que eles existem antes de importar.
 
 A coluna `project` é adicionada automaticamente na inicialização do servidor (`server.js`) quando não existir, sem apagar registros.
 
