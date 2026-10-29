@@ -3,8 +3,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, LoaderCircle } from "lucide-react";
-import { useMemo, useState } from "react";
+import { FileText, Image as ImageIcon, LoaderCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { departments, statuses } from "@/lib/constants";
 import { existingImages, filterImages } from "@/lib/image-library";
 import { shortFileName } from "@/lib/format";
@@ -30,12 +30,34 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
     saveEquipment,
   } = store;
 
-  // Catálogo de imagens que já estão em uploads/images: reaproveitar evita enviar
-  // o mesmo arquivo de novo e faz vários registros apontarem para uma única cópia.
-  const [libraryOpen, setLibraryOpen] = useState(false);
+  // Duas fontes possíveis para a imagem, uma de cada vez: arquivo do computador ou
+  // imagem que já está em uploads/images. Juntas elas deixariam dúvida sobre o que
+  // vai ser salvo, então a escolha da lista descarta o arquivo pendente.
+  const [imageSource, setImageSource] = useState<"upload" | "library">("upload");
   const [libraryQuery, setLibraryQuery] = useState("");
+  // Trocar a chave remonta o <input type="file">: o nome que ele exibe não tem como
+  // ser limpo por estado.
+  const [fileKeys, setFileKeys] = useState({ term: 0, image: 0 });
   const catalog = useMemo(() => existingImages(items), [items]);
   const gallery = useMemo(() => filterImages(catalog, libraryQuery), [catalog, libraryQuery]);
+
+  // Fechou o modal: na próxima abertura a imagem volta para "Enviar arquivo".
+  useEffect(() => {
+    if (dialogOpen) return;
+    setImageSource("upload");
+    setLibraryQuery("");
+  }, [dialogOpen]);
+
+  const dropFile = (kind: "term" | "image") => {
+    if (kind === "term") setTermFile(null);
+    else setImageFile(null);
+    setFileKeys((keys) => ({ ...keys, [kind]: keys[kind] + 1 }));
+  };
+
+  const chooseImageSource = (source: "upload" | "library") => {
+    if (source === "library" && imageFile) dropFile("image");
+    setImageSource(source);
+  };
 
   // Só muda o caminho gravado: o arquivo não sobe outra vez e continua compartilhado.
   const useExistingImage = (path: string) => {
@@ -51,17 +73,12 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
 
   return (
 
-    <Dialog
-      open={dialogOpen}
-      onOpenChange={(open) => {
-        if (!open) {
-          setLibraryOpen(false);
-          setLibraryQuery("");
-        }
-        setDialogOpen(open);
-      }}
-    >
-      <DialogContent>
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <DialogContent
+        // Sem isso o Radix foca o primeiro campo ao abrir, e no celular o teclado
+        // já sobe cobrindo o formulário antes de a pessoa decidir o que editar.
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
         <div>
           <DialogTitle className="text-xl font-bold">
             {editing ? "Editar equipamento" : "Novo equipamento"}
@@ -199,18 +216,11 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
             </Field>
             <Field label="PDF do termo">
               <Input
+                key={`term-${fileKeys.term}`}
                 type="file"
                 accept="application/pdf,.pdf"
                 className="h-auto py-2"
                 onChange={(e) => setTermFile(e.target.files?.[0] || null)}
-              />
-            </Field>
-            <Field label="Imagem do equipamento">
-              <Input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
-                className="h-auto py-2"
-                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
               />
             </Field>
           </div>
@@ -290,19 +300,70 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
               )}
             </div>
           )}
+          {(termFile || imageFile) && (
+            <div className="grid gap-3 rounded-lg border bg-slate-50 p-3 sm:grid-cols-2 dark:bg-slate-800/60">
+              {termFile && (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <FileText className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+                  <span
+                    className="min-w-0 flex-1 truncate text-muted-foreground"
+                    title={termFile.name}
+                  >
+                    PDF selecionado: {shortFileName(termFile.name)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => dropFile("term")}
+                    className="font-medium text-red-600 underline dark:text-red-400"
+                  >
+                    Remover PDF selecionado
+                  </button>
+                </div>
+              )}
+              {imageFile && (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <ImageIcon className="h-4 w-4 shrink-0 text-primary" />
+                  <span
+                    className="min-w-0 flex-1 truncate text-muted-foreground"
+                    title={imageFile.name}
+                  >
+                    Imagem selecionada: {shortFileName(imageFile.name)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => dropFile("image")}
+                    className="font-medium text-red-600 underline dark:text-red-400"
+                  >
+                    Remover imagem selecionada
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           <div className="rounded-lg border bg-slate-50 p-3 dark:bg-slate-800/60">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setLibraryOpen((open) => !open)}
-              >
-                {libraryOpen
-                  ? "Fechar imagens cadastradas"
-                  : "Usar imagem já cadastrada"}
-              </Button>
-              {libraryOpen && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Imagem do equipamento
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={imageSource === "upload" ? "default" : "outline"}
+                  onClick={() => chooseImageSource("upload")}
+                >
+                  Enviar arquivo
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={imageSource === "library" ? "default" : "outline"}
+                  onClick={() => chooseImageSource("library")}
+                >
+                  Usar imagem cadastrada
+                </Button>
+              </div>
+              {imageSource === "library" && (
                 <Input
                   value={libraryQuery}
                   onChange={(e) => setLibraryQuery(e.target.value)}
@@ -311,7 +372,15 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
                 />
               )}
             </div>
-            {libraryOpen && (
+            {imageSource === "upload" ? (
+              <Input
+                key={`image-${fileKeys.image}`}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
+                className="mt-3 h-auto py-2"
+                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+              />
+            ) : (
               <>
                 <p className="mt-2 text-xs text-muted-foreground">
                   O registro passa a apontar para o arquivo que já está em{" "}
@@ -360,16 +429,6 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
               </>
             )}
           </div>
-          {termFile && (
-            <p className="text-xs text-muted-foreground" title={termFile.name}>
-              PDF selecionado: {shortFileName(termFile.name)}
-            </p>
-          )}
-          {imageFile && (
-            <p className="text-xs text-muted-foreground" title={imageFile.name}>
-              Imagem selecionada: {shortFileName(imageFile.name)}
-            </p>
-          )}
           <div className="flex justify-end gap-2 border-t pt-4">
             <Button
               type="button"
