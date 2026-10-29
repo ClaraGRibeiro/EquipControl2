@@ -223,6 +223,35 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
                 onChange={(e) => setTermFile(e.target.files?.[0] || null)}
               />
             </Field>
+            <div className="grid gap-1.5">
+              <Field label="Imagem do equipamento">
+                {imageSource === "upload" ? (
+                  <Input
+                    key={`image-${fileKeys.image}`}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
+                    className="h-auto py-2"
+                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                  />
+                ) : (
+                  <p className="rounded-md border border-dashed px-3 py-2 text-xs font-normal text-muted-foreground">
+                    escolhendo entre as {catalog.length} imagens que já estão
+                    cadastradas, logo abaixo
+                  </p>
+                )}
+              </Field>
+              <button
+                type="button"
+                onClick={() =>
+                  chooseImageSource(imageSource === "upload" ? "library" : "upload")
+                }
+                className="justify-self-start text-xs font-medium text-primary underline underline-offset-2"
+              >
+                {imageSource === "upload"
+                  ? "ou usar uma imagem já cadastrada"
+                  : "ou enviar um arquivo do computador"}
+              </button>
+            </div>
           </div>
           {(form.term || form.image) && (
             <div className="grid gap-3 rounded-lg border bg-slate-50 p-3 sm:grid-cols-2 dark:bg-slate-800/60">
@@ -340,95 +369,74 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
               )}
             </div>
           )}
-          <div className="rounded-lg border bg-slate-50 p-3 dark:bg-slate-800/60">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
+          {imageSource === "library" && (
+            <div className="rounded-lg border bg-slate-50 p-3 dark:bg-slate-800/60">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Imagem do equipamento
+                  Imagens cadastradas
                 </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={imageSource === "upload" ? "default" : "outline"}
-                  onClick={() => chooseImageSource("upload")}
-                >
-                  Enviar arquivo
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={imageSource === "library" ? "default" : "outline"}
-                  onClick={() => chooseImageSource("library")}
-                >
-                  Usar imagem cadastrada
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    value={libraryQuery}
+                    onChange={(e) => setLibraryQuery(e.target.value)}
+                    placeholder="Filtrar por equipamento..."
+                    className="h-9 w-full max-w-[240px]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => chooseImageSource("upload")}
+                    className="text-xs font-medium text-primary underline underline-offset-2"
+                  >
+                    Fechar
+                  </button>
+                </div>
               </div>
-              {imageSource === "library" && (
-                <Input
-                  value={libraryQuery}
-                  onChange={(e) => setLibraryQuery(e.target.value)}
-                  placeholder="Filtrar por equipamento..."
-                  className="h-9 w-full max-w-[240px]"
-                />
+              <p className="mt-2 text-xs text-muted-foreground">
+                O registro passa a apontar para o arquivo que já está em{" "}
+                <code>uploads/images</code>: nada é enviado de novo, e enquanto
+                outro equipamento usar o mesmo arquivo ele não é apagado.
+              </p>
+              {gallery.length === 0 ? (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {catalog.length
+                    ? "Nenhuma imagem corresponde ao filtro."
+                    : "Nenhum equipamento tem imagem cadastrada ainda."}
+                </p>
+              ) : (
+                <div className="mt-3 grid max-h-56 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-4">
+                  {gallery.map((image) => {
+                    const active = sameFile(image.path);
+                    return (
+                      <button
+                        key={image.path}
+                        type="button"
+                        title={`${image.owners.join(", ")} — ${image.count} registro(s)`}
+                        onClick={() => useExistingImage(image.path)}
+                        className={cn(
+                          "rounded-md border bg-white p-2 text-left transition-colors hover:border-primary dark:bg-slate-900",
+                          active && "border-primary ring-2 ring-ring",
+                        )}
+                      >
+                        <img
+                          src={assetUrl(image.path)}
+                          alt={image.label}
+                          className="h-16 w-full rounded border object-cover"
+                        />
+                        <span className="mt-1 block truncate text-xs font-medium">
+                          {image.label}
+                        </span>
+                        <span className="block text-[11px] text-muted-foreground">
+                          {active
+                            ? "em uso neste registro"
+                            : `${image.count} registro(s)`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
-            {imageSource === "upload" ? (
-              <Input
-                key={`image-${fileKeys.image}`}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
-                className="mt-3 h-auto py-2"
-                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-              />
-            ) : (
-              <>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  O registro passa a apontar para o arquivo que já está em{" "}
-                  <code>uploads/images</code>: nada é enviado de novo, e enquanto
-                  outro equipamento usar o mesmo arquivo ele não é apagado.
-                </p>
-                {gallery.length === 0 ? (
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {catalog.length
-                      ? "Nenhuma imagem corresponde ao filtro."
-                      : "Nenhum equipamento tem imagem cadastrada ainda."}
-                  </p>
-                ) : (
-                  <div className="mt-3 grid max-h-56 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-4">
-                    {gallery.map((image) => {
-                      const active = sameFile(image.path);
-                      return (
-                        <button
-                          key={image.path}
-                          type="button"
-                          title={`${image.owners.join(", ")} — ${image.count} registro(s)`}
-                          onClick={() => useExistingImage(image.path)}
-                          className={cn(
-                            "rounded-md border bg-white p-2 text-left transition-colors hover:border-primary dark:bg-slate-900",
-                            active && "border-primary ring-2 ring-ring",
-                          )}
-                        >
-                          <img
-                            src={assetUrl(image.path)}
-                            alt={image.label}
-                            className="h-16 w-full rounded border object-cover"
-                          />
-                          <span className="mt-1 block truncate text-xs font-medium">
-                            {image.label}
-                          </span>
-                          <span className="block text-[11px] text-muted-foreground">
-                            {active
-                              ? "em uso neste registro"
-                              : `${image.count} registro(s)`}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+          )}
           <div className="flex justify-end gap-2 border-t pt-4">
             <Button
               type="button"
