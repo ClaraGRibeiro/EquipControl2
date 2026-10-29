@@ -245,37 +245,6 @@ export function EquipmentDetailDialog({
                   />
                 </div>
               )}
-              {item.image && (
-                <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-2">
-                      <ImageIcon className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold">
-                          Imagem do equipamento
-                        </p>
-                        <p
-                          className="mt-0.5 break-all text-xs text-muted-foreground"
-                          title={item.image}
-                        >
-                          {fileName(item.image)}
-                        </p>
-                      </div>
-                    </div>
-                    <a
-                      href={assetUrl(item.image)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="shrink-0 rounded-md border bg-white px-2 py-1 text-xs font-medium hover:bg-muted dark:bg-slate-800"
-                    >
-                      Abrir imagem
-                    </a>
-                  </div>
-                  <div className="mt-3 text-xs text-muted-foreground">
-                    Clique na foto acima para abrir em tamanho real.
-                  </div>
-                </div>
-              )}
               {!item.term && (
                 <div className="rounded-xl border border-dashed border-slate-300 p-4 dark:border-slate-700">
                   <div className="flex items-start gap-2">
