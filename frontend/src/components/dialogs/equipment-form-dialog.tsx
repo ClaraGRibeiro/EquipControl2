@@ -225,7 +225,7 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
             </Field>
             <div className="grid gap-1.5">
               <Field label="Imagem do equipamento">
-                {imageSource === "upload" ? (
+                {imageSource === "upload" && (
                   <Input
                     key={`image-${fileKeys.image}`}
                     type="file"
@@ -233,11 +233,6 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
                     className="h-auto py-2"
                     onChange={(e) => setImageFile(e.target.files?.[0] || null)}
                   />
-                ) : (
-                  <p className="rounded-md border border-dashed px-3 py-2 text-xs font-normal text-muted-foreground">
-                    escolhendo entre as {catalog.length} imagens que já estão
-                    cadastradas, logo abaixo
-                  </p>
                 )}
               </Field>
               <button
@@ -375,21 +370,12 @@ export function EquipmentFormDialog({ store }: { store: InventoryController }) {
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
                   Imagens cadastradas
                 </span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Input
-                    value={libraryQuery}
-                    onChange={(e) => setLibraryQuery(e.target.value)}
-                    placeholder="Filtrar por equipamento..."
-                    className="h-9 w-full max-w-[240px]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => chooseImageSource("upload")}
-                    className="text-xs font-medium text-primary underline underline-offset-2"
-                  >
-                    Fechar
-                  </button>
-                </div>
+                <Input
+                  value={libraryQuery}
+                  onChange={(e) => setLibraryQuery(e.target.value)}
+                  placeholder="Filtrar por equipamento..."
+                  className="h-9 w-full max-w-[240px]"
+                />
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
                 O registro passa a apontar para o arquivo que já está em{" "}
